@@ -46,6 +46,8 @@ sub register_ns {
 	my $self = shift;
 	my ( $pfx, $uri ) = @_;
 
+	$uri = $stringify->( $uri );
+
 	croak "Invalid namespace binding prefix '$pfx'"
 		if length $pfx and $pfx =~ /[\w-]/;
 
