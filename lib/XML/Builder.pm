@@ -46,7 +46,10 @@ sub register_ns {
 	my $self = shift;
 	my ( $pfx, $uri ) = @_;
 
-	croak 'Cannot re-register namespace'
+	croak "Invalid namespace binding prefix '$pfx'"
+		if length $pfx and $pfx =~ /[\w-]/;
+
+	croak "Namespace '$uri' being bound to '$pfx' is already bound to '$self->{ ns }{ $uri }'"
 		if exists $self->{ ns }{ $uri };
 
 	$self->{ ns }{ $uri } = $pfx;
