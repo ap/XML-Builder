@@ -190,8 +190,8 @@ sub render {
 sub flatten_cdata {
 	my $self = shift;
 	my ( $str ) = @_;
-	$str =~ s{<!\[CDATA\[(.*?)]]>}{ $self->escape_text( $1 ) }ge;
-	croak 'Incomplete CDATA section' if -1 < index $str, "<![CDATA[";
+	$str =~ s{<!\[CDATA\[(.*?)]]>}{ $self->escape_text( $1 ) }gse;
+	croak 'Incomplete CDATA section' if -1 < index $str, '<![CDATA[';
 	return $str;
 }
 
