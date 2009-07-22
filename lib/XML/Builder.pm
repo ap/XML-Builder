@@ -29,10 +29,9 @@ our $is_hash = sub {
 
 sub new {
 	return bless {
-		encoding            => 'us-ascii',
-		content             => undef,
-		ns                  => {}, # CRUCIAL: must be shared by all clones!
-		have_default_ns => !1,
+		encoding => 'us-ascii',
+		content  => undef,
+		nsmap    => XML::Builder::NSMap->new(), # CRUCIAL: must be shared by all clones!
 		@_
 	}, shift
 }
@@ -42,49 +41,28 @@ sub clone {
 	return bless { %$self, @_ }, ref $self;
 }
 
+sub nsmap { $_[0]->{ nsmap } }
+
 sub register_ns {
 	my $self = shift;
 	my ( $pfx, $uri ) = @_;
-
-	$uri = $stringify->( $uri );
-
-	croak "Invalid namespace binding prefix '$pfx'"
-		if length $pfx and $pfx =~ /[\w-]/;
-
-	croak "Namespace '$uri' being bound to '$pfx' is already bound to '$self->{ ns }{ $uri }'"
-		if exists $self->{ ns }{ $uri };
-
-	$self->{ ns }{ $uri } = $pfx;
-	$self->{ have_default_ns } ||= ( '' eq $pfx );
-
+	$self->nsmap->register( $pfx, $stringify->( $uri ) );
 	return $self;
-}
-
-sub find_or_create_prefix {
-	my $self = shift;
-	my ( $uri ) = @_;
-
-	my $ns = $self->{ ns };
-
-	if ( not exists $ns->{ $uri } ) {
-		my $letter = ( $uri =~ m!([[:alpha:]])[^/]*/?\z! ) ? lc $1 : 'ns';
-		$ns->{ $uri } = $letter . ( 1 + keys %$ns );
-	}
-
-	return $ns->{ $uri };
 }
 
 sub clark_to_qname {
 	my $self = shift;
 	my ( $qname, $is_attr ) = @_;
 
+	my $map = $self->nsmap;
+
 	if ( not $qname =~ s/\A\{// ) {
-		return $qname if $is_attr or not $self->{ have_default_ns };
+		return $qname if $is_attr or not $map->default;
 		croak "Cannot create element '$qname' outside a namespace when a default namespace is registered";
 	}
 
 	my ( $uri, $localname ) = split /\}/, $qname, 2;
-	my $pfx = $self->find_or_create_prefix( $uri );
+	my $pfx = $map->find_or_create_prefix( $uri );
 	return '' eq $pfx ? $localname : $pfx . ':' . $localname;
 }
 
@@ -132,16 +110,19 @@ sub root {
 	my $name = shift;
 	my $attr = $is_hash->( $_[0] ) ? shift : {};
 
-	my $default_ns;
+	my $map = $self->nsmap;
 
-	while ( my ( $uri, $pfx ) = each %{ $self->{ ns } } ) {
-		if ( '' eq $pfx ) { $default_ns = $uri; next }
-		$attr->{ 'xmlns:' . $pfx } = $uri;
+	for my $uri ( $map->list ) {
+		my $pfx = $map->find_or_create_prefix( $uri );
+		$attr->{ 'xmlns:' . $pfx } = $uri
+			if '' ne $pfx;
 	}
 
 	# if no default NS is declared, explicitly undefine it; this allows
 	# embedding as a fragment into scopes that do have a default namespace
-	$attr->{ xmlns } = defined $default_ns ? $default_ns : '';
+	# [in 5.10: $attr->{ xmlns } = $map->default // '';]
+	$attr->{ xmlns } = $map->default;
+	$attr->{ xmlns } .= '';
 
 	return $self->tag( $name, $attr, \@_ );
 }
@@ -199,11 +180,59 @@ sub flatten_cdata {
 #sub as_string { $_[0]->{ content } // () }
 sub as_string { my $c = $_[0]->{ content }; defined $c ? $c : () }
 
-{
-package XML::Builder::NS;
-use overload '""' => sub { ${$_[0]} };
-sub new { bless \do { my $copy = $_[1] }, $_[0] }
-sub AUTOLOAD { our $AUTOLOAD =~ /.*::(.*)/; '{' . ${$_[0]} . '}' . $1 }
+
+
+#######################################################################
+
+package XML::Builder::NSMap;
+
+sub croak { require Carp; goto &Carp::croak }
+
+sub new { bless {}, shift }
+
+sub default { $_[0]->{ '-' } }
+
+sub register {
+	my $self = shift;
+	my ( $pfx, $uri ) = @_;
+
+	croak "Invalid namespace binding prefix '$pfx'"
+		if length $pfx and $pfx =~ /[\w-]/;
+
+	croak "Namespace '$uri' being bound to '$pfx' is already bound to '$self->{ $uri }'"
+		if exists $self->{ $uri };
+
+	$self->{ $uri } = $pfx;
+	$self->{ '-' } = $uri if '' eq $pfx;
+
+	return $self;
 }
+
+sub find_or_create_prefix {
+	my $self = shift;
+	my ( $uri ) = @_;
+
+	if ( not exists $self->{ $uri } ) {
+		my $letter = ( $uri =~ m!([[:alpha:]])[^/]*/?\z! ) ? lc $1 : 'ns';
+		$self->{ $uri } = $letter . ( 1 + keys %$self );
+	}
+
+	return $self->{ $uri };
+}
+
+sub list { grep '-' ne $_, keys %{ $_[0] } }
+
+
+#######################################################################
+
+package XML::Builder::NS;
+
+use overload '""' => sub { ${$_[0]} };
+
+sub new { bless \do { my $copy = $_[1] }, $_[0] }
+
+sub AUTOLOAD { our $AUTOLOAD =~ /.*::(.*)/; '{' . ${$_[0]} . '}' . $1 }
+
+
 
 1;
