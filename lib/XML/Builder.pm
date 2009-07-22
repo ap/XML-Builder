@@ -46,8 +46,9 @@ sub nsmap { $_[0]->{ nsmap } }
 sub register_ns {
 	my $self = shift;
 	my ( $pfx, $uri ) = @_;
-	$self->nsmap->register( $pfx, $stringify->( $uri ) );
-	return $self;
+	my $_uri = $stringify->( $uri );
+	$self->nsmap->register( $_uri, $pfx );
+	return XML::Builder::NS->new( $_uri );
 }
 
 sub clark_to_qname {
@@ -194,13 +195,20 @@ sub default { $_[0]->{ '-' } }
 
 sub register {
 	my $self = shift;
-	my ( $pfx, $uri ) = @_;
+	my ( $uri, $pfx ) = @_;
 
-	croak "Invalid namespace binding prefix '$pfx'"
-		if length $pfx and $pfx =~ /[\w-]/;
+	if ( defined $pfx ) {
+		# FIXME needs proper validity check per XML TR
+		croak "Invalid namespace prefix '$pfx'"
+			if length $pfx and $pfx !~ /[\w-]/;
 
-	croak "Namespace '$uri' being bound to '$pfx' is already bound to '$self->{ $uri }'"
-		if exists $self->{ $uri };
+		croak "Namespace '$uri' being bound to '$pfx' is already bound to '$self->{ $uri }'"
+			if exists $self->{ $uri };
+	}
+	else {
+		my $letter = ( $uri =~ m!([[:alpha:]])[^/]*/?\z! ) ? lc $1 : 'ns';
+		$pfx = $letter . ( 1 + keys %$self );
+	}
 
 	$self->{ $uri } = $pfx;
 	$self->{ '-' } = $uri if '' eq $pfx;
@@ -211,12 +219,7 @@ sub register {
 sub find_or_create_prefix {
 	my $self = shift;
 	my ( $uri ) = @_;
-
-	if ( not exists $self->{ $uri } ) {
-		my $letter = ( $uri =~ m!([[:alpha:]])[^/]*/?\z! ) ? lc $1 : 'ns';
-		$self->{ $uri } = $letter . ( 1 + keys %$self );
-	}
-
+	$self->register( $uri ) if not exists $self->{ $uri };
 	return $self->{ $uri };
 }
 
