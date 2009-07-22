@@ -231,8 +231,9 @@ use overload '""' => sub { ${$_[0]} };
 
 sub new { bless \do { my $copy = $_[1] }, $_[0] }
 
-sub AUTOLOAD { our $AUTOLOAD =~ /.*::(.*)/; '{' . ${$_[0]} . '}' . $1 }
+sub qname { '{' . ${$_[0]} . '}' . $_[1] }
 
+sub AUTOLOAD { our $AUTOLOAD =~ /.*::(.*)/; shift->qname( $1 ) }
 
 
 1;
