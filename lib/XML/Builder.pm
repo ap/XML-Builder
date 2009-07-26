@@ -55,18 +55,18 @@ sub register_ns {
 
 sub clark_to_qname {
 	my $self = shift;
-	my ( $qname, $is_attr ) = @_;
+	my ( $name, $is_attr ) = @_;
 
-	my $map = $self->nsmap;
+	my $uri = ( $name =~ s/\A\{([^}]+)\}// ) ? $1 : '';
+	my $pfx = '';
 
-	if ( not $qname =~ s/\A\{// ) {
-		return $qname if $is_attr or not $map->default;
-		croak "Cannot create element '$qname' outside a namespace when a default namespace is registered";
-	}
+	# attributes without a prefix are in the null namespace,
+	# not in the default namespace, so never put a prefix on
+	# attributes in the null namespace
+	$pfx = $self->nsmap->find_or_create_prefix( $uri )
+		unless '' eq $uri and $is_attr;
 
-	my ( $uri, $localname ) = split /\}/, $qname, 2;
-	my $pfx = $map->find_or_create_prefix( $uri );
-	return '' eq $pfx ? $localname : $pfx . ':' . $localname;
+	return '' eq $pfx ? $name : "$pfx:$name";
 }
 
 sub tag {
