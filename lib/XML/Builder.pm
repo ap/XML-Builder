@@ -87,7 +87,7 @@ sub tag {
 			}
 			# re-render tag
 			$tag = join ' ', $qname,
-				map { $self->clark_to_qname( $_, 1 ) . '="' . $self->escape_attr( $attr{ $_ } ) . '"' }
+				map { sprintf '%s="%s"', $self->clark_to_qname( $_, 1 ), $self->escape_attr( $attr{ $_ } ) }
 				sort keys %attr;
 		}
 
