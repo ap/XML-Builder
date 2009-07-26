@@ -215,8 +215,14 @@ sub qname {
 	my $self = shift;
 	my ( $name, $is_attr ) = @_;
 
-	my $uri = ( $name =~ s/\A\{([^}]+)\}// ) ? $1 : '';
-	my $pfx = '';
+	my $uri = my $pfx = '';
+
+	if ( 'ARRAY' eq ref $name ) {
+		( $uri, $name ) = @$name;
+	}
+	elsif ( $name =~ s/\A\{([^}]+)\}// ) {
+		$uri = $1;
+	}
 
 	# attributes without a prefix are in the null namespace,
 	# not in the default namespace, so never put a prefix on
@@ -238,7 +244,9 @@ sub new { bless \do { my $uri = $_[1] }, $_[0] }
 
 sub qname { '{' . ${$_[0]} . '}' . $_[1] }
 
-sub AUTOLOAD { our $AUTOLOAD =~ /.*::(.*)/; shift->qname( $1 ) }
+sub qpair { my $self = shift; [ $$self, @_ ] }
+
+sub AUTOLOAD { our $AUTOLOAD =~ /.*::(.*)/; shift->qpair( $1 ) }
 
 
 1;
