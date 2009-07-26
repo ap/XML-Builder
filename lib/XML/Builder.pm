@@ -38,7 +38,9 @@ sub new {
 
 sub clone {
 	my $self = shift;
-	return bless { %$self, @_ }, ref $self;
+	my $clone = bless { %$self, @_ }, ref $self;
+	$clone->{ nsmap } = $self->{ nsmap };
+	return $clone;
 }
 
 sub nsmap { $_[0]->{ nsmap } }
