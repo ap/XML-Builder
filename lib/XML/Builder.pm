@@ -234,7 +234,7 @@ package XML::Builder::NS;
 
 use overload '""' => sub { ${$_[0]} };
 
-sub new { bless \do { my $copy = $_[1] }, $_[0] }
+sub new { bless \do { my $uri = $_[1] }, $_[0] }
 
 sub qname { '{' . ${$_[0]} . '}' . $_[1] }
 
