@@ -53,27 +53,11 @@ sub register_ns {
 	return XML::Builder::NS->new( $_uri );
 }
 
-sub clark_to_qname {
-	my $self = shift;
-	my ( $name, $is_attr ) = @_;
-
-	my $uri = ( $name =~ s/\A\{([^}]+)\}// ) ? $1 : '';
-	my $pfx = '';
-
-	# attributes without a prefix are in the null namespace,
-	# not in the default namespace, so never put a prefix on
-	# attributes in the null namespace
-	$pfx = $self->nsmap->find_or_create_prefix( $uri )
-		unless '' eq $uri and $is_attr;
-
-	return '' eq $pfx ? $name : "$pfx:$name";
-}
-
 sub tag {
 	my $self = shift;
 	my $name = shift;
 
-	my $qname = $self->clark_to_qname( $name );
+	my $qname = $self->nsmap->qname( $name );
 	my $tag   = $qname;
 	my %attr  = ();
 	my @out   = ();
@@ -87,7 +71,7 @@ sub tag {
 			}
 			# re-render tag
 			$tag = join ' ', $qname,
-				map { sprintf '%s="%s"', $self->clark_to_qname( $_, 1 ), $self->escape_attr( $attr{ $_ } ) }
+				map { sprintf '%s="%s"', $self->nsmap->qname( $_, 1 ), $self->escape_attr( $attr{ $_ } ) }
 				sort keys %attr;
 		}
 
@@ -226,6 +210,22 @@ sub find_or_create_prefix {
 }
 
 sub list { grep '-' ne $_, keys %{ $_[0] } }
+
+sub qname {
+	my $self = shift;
+	my ( $name, $is_attr ) = @_;
+
+	my $uri = ( $name =~ s/\A\{([^}]+)\}// ) ? $1 : '';
+	my $pfx = '';
+
+	# attributes without a prefix are in the null namespace,
+	# not in the default namespace, so never put a prefix on
+	# attributes in the null namespace
+	$pfx = $self->find_or_create_prefix( $uri )
+		unless '' eq $uri and $is_attr;
+
+	return '' eq $pfx ? $name : "$pfx:$name";
+}
 
 
 #######################################################################
