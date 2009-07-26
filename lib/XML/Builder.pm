@@ -2,7 +2,7 @@ package XML::Builder;
 
 use strict;
 use Encode ();
-use Scalar::Util qw( blessed );
+use Scalar::Util ();
 use overload '""', 'as_string';
 
 our $VERSION = '1.0000';
@@ -14,7 +14,7 @@ our $stringify = sub {
 
 	return if not defined $thing;
 
-	return $thing if not blessed $thing;
+	return $thing if not Scalar::Util::blessed $thing;
 
 	my $conv = $thing->can( 'as_string' ) || overload::Method( $thing, '""' );
 	return $conv->( $thing ) if $conv;
@@ -24,7 +24,7 @@ our $stringify = sub {
 
 our $is_hash = sub {
 	my ( $scalar ) = @_;
-	return 'HASH' eq ref $scalar and not blessed $scalar;
+	return 'HASH' eq ref $scalar and not Scalar::Util::blessed $scalar;
 };
 
 sub new {
@@ -135,7 +135,7 @@ sub render {
 	my ( $r ) = @_;
 
 	my $type = ref $r;
-	my $is_obj = $type && blessed $r;
+	my $is_obj = $type && Scalar::Util::blessed $r;
 
 	# make sure to retain objectness when called by user
 	return $r if $is_obj and $r->isa( __PACKAGE__ );
