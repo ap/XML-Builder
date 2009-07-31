@@ -3,7 +3,6 @@ package XML::Builder;
 use strict;
 use Encode ();
 use Scalar::Util ();
-use overload '""', 'as_string';
 
 our $VERSION = '1.0000';
 
@@ -120,8 +119,7 @@ sub render {
 	my $type = ref $r;
 	my $is_obj = $type && Scalar::Util::blessed $r;
 
-	# make sure to retain objectness when called by user
-	return $r if $is_obj and $r->isa( __PACKAGE__ );
+	return $r->as_string if $is_obj and $r->isa( __PACKAGE__ );
 
 	return
 		  'ARRAY' eq $type                     ? join( '', map { (defined) ? $self->render( $_ ) : () } @$r )
