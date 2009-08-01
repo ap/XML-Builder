@@ -98,7 +98,7 @@ sub root {
 	my $map = $self->nsmap;
 
 	for my $uri ( $map->list ) {
-		my $pfx = $map->find_or_create_prefix( $uri );
+		my $pfx = $map->prefix_for( $uri );
 		$attr->{ 'xmlns:' . $pfx } = $uri
 			if '' ne $pfx;
 	}
@@ -199,7 +199,7 @@ sub register {
 	return $self;
 }
 
-sub find_or_create_prefix {
+sub prefix_for {
 	my $self = shift;
 	my ( $uri ) = @_;
 	$self->register( $uri ) if not exists $self->{ $uri };
@@ -224,7 +224,7 @@ sub qname {
 	# attributes without a prefix are in the null namespace,
 	# not in the default namespace, so never put a prefix on
 	# attributes in the null namespace
-	$pfx = $self->find_or_create_prefix( $uri )
+	$pfx = $self->prefix_for( $uri )
 		unless '' eq $uri and $is_attr;
 
 	return '' eq $pfx ? $name : "$pfx:$name";
