@@ -116,16 +116,17 @@ sub render {
 	my $self = shift;
 	my ( $r ) = @_;
 
-	my $type = ref $r;
-	my $is_obj = $type && Scalar::Util::blessed $r;
+	my $t          = ref $r;
+	my $is_obj     = $t && Scalar::Util::blessed $r;
+	my $is_arefref = 'REF' eq $t && 'ARRAY' eq ref $$r;
 
 	return $r->as_string if $is_obj and $r->isa( __PACKAGE__ );
 
 	return
-		  'ARRAY' eq $type                     ? join( '', map { (defined) ? $self->render( $_ ) : () } @$r )
-		: 'REF' eq $type && 'ARRAY' eq ref $$r ? scalar $self->tag( @$$r )
-		: $type && ! $is_obj                   ? croak( 'Unknown type of reference ', $type )
-		: defined $r                           ? $self->escape_text( $stringify->( $r ) )
+		  'ARRAY' eq $t   ? ( join '', map $self->render( $_ ), grep defined, @$r )
+		: $is_arefref     ? scalar $self->tag( @$$r )
+		: $t && ! $is_obj ? ( croak 'Unknown type of reference ', $t )
+		: defined $r      ? $self->escape_text( $stringify->( $r ) )
 		: ();
 }
 
