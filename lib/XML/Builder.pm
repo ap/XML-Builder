@@ -8,19 +8,7 @@ our $VERSION = '1.0000';
 
 sub croak { require Carp; goto &Carp::croak }
 
-our $stringify = sub {
-	my ( $thing ) = @_;
-
-	return if not defined $thing;
-
-	return $thing if not Scalar::Util::blessed $thing;
-
-	my $conv = $thing->can( 'as_string' ) || overload::Method( $thing, '""' );
-	return $conv->( $thing ) if $conv;
-
-	croak 'Unstringifiable object ', $thing;
-};
-
+# XXX probably should be replaced with Params::Util?
 our $is_hash = sub {
 	my ( $scalar ) = @_;
 	return 'HASH' eq ref $scalar and not Scalar::Util::blessed $scalar;
@@ -46,7 +34,7 @@ sub nsmap { $_[0]->{ nsmap } }
 sub register_ns {
 	my $self = shift;
 	my ( $pfx, $uri ) = @_;
-	my $_uri = $stringify->( $uri );
+	my $_uri = $self->stringify( $uri );
 	$self->nsmap->register( $_uri, $pfx );
 	return XML::Builder::NS->new( $_uri );
 }
@@ -126,7 +114,7 @@ sub render {
 		  'ARRAY' eq $t   ? ( join '', map $self->render( $_ ), grep defined, @$r )
 		: $is_arefref     ? scalar $self->tag( @$$r )
 		: $t && ! $is_obj ? ( croak 'Unknown type of reference ', $t )
-		: defined $r      ? $self->escape_text( $stringify->( $r ) )
+		: defined $r      ? $self->escape_text( $self->stringify( $r ) )
 		: ();
 }
 
@@ -146,11 +134,25 @@ sub render {
 		my $slot = do { no strict 'refs'; \*{ $subname } };
 		*$slot = sub {
 			my $self = shift;
-			my $str = $stringify->( shift );
+			my $str = $self->stringify( shift );
 			$str =~ s{ $specials_rx }{ $XML_NCR{$1} }gex;
 			return Encode::encode $self->{ 'encoding' }, $str, Encode::HTMLCREF;
 		}
 	}
+}
+
+sub stringify {
+	my $self = shift;
+	my ( $thing ) = @_;
+
+	return if not defined $thing;
+
+	return $thing if not Scalar::Util::blessed $thing;
+
+	my $conv = $thing->can( 'as_string' ) || overload::Method( $thing, '""' );
+	return $conv->( $thing ) if $conv;
+
+	$croak->( 'Unstringifiable object ', $thing );
 }
 
 sub flatten_cdata {
