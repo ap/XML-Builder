@@ -242,7 +242,7 @@ sub new { bless \do { my $uri = $_[1] }, $_[0] }
 
 sub qname { '{' . ${$_[0]} . '}' . $_[1] }
 
-sub qpair { my $self = shift; [ $$self, @_ ] }
+sub qpair { my $self = shift; [ $$self, $_[0] ] }
 
 sub AUTOLOAD { our $AUTOLOAD =~ /.*::(.*)/; shift->qpair( $1 ) }
 
