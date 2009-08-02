@@ -1,3 +1,5 @@
+my $croak = sub { require Carp; goto &Carp::croak }; # file scope!
+
 package XML::Builder;
 
 use strict;
@@ -5,8 +7,6 @@ use Encode ();
 use Scalar::Util ();
 
 our $VERSION = '1.0000';
-
-sub croak { require Carp; goto &Carp::croak }
 
 # XXX probably should be replaced with Params::Util?
 our $is_hash = sub {
@@ -113,7 +113,7 @@ sub render {
 	return
 		  'ARRAY' eq $t   ? ( join '', map $self->render( $_ ), grep defined, @$r )
 		: $is_arefref     ? scalar $self->tag( @$$r )
-		: $t && ! $is_obj ? ( croak 'Unknown type of reference ', $t )
+		: $t && ! $is_obj ? $croak->( 'Unknown type of reference ', $t )
 		: defined $r      ? $self->escape_text( $self->stringify( $r ) )
 		: ();
 }
@@ -159,7 +159,7 @@ sub flatten_cdata {
 	my $self = shift;
 	my ( $str ) = @_;
 	$str =~ s{<!\[CDATA\[(.*?)]]>}{ $self->escape_text( $1 ) }gse;
-	croak 'Incomplete CDATA section' if -1 < index $str, '<![CDATA[';
+	$croak->( 'Incomplete CDATA section' ) if -1 < index $str, '<![CDATA[';
 	return $str;
 }
 
@@ -173,8 +173,6 @@ sub as_string { my $c = $_[0]->{ content }; defined $c ? $c : () }
 
 package XML::Builder::NSMap;
 
-sub croak { require Carp; goto &Carp::croak }
-
 sub new { bless {}, shift }
 
 sub default { $_[0]->{ '-' } }
@@ -185,10 +183,10 @@ sub register {
 
 	if ( defined $pfx ) {
 		# FIXME needs proper validity check per XML TR
-		croak "Invalid namespace prefix '$pfx'"
+		$croak->( "Invalid namespace prefix '$pfx'" )
 			if length $pfx and $pfx !~ /[\w-]/;
 
-		croak "Namespace '$uri' being bound to '$pfx' is already bound to '$self->{ $uri }'"
+		$croak->( "Namespace '$uri' being bound to '$pfx' is already bound to '$self->{ $uri }'" )
 			if exists $self->{ $uri };
 	}
 	else {
