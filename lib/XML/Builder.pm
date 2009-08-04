@@ -33,7 +33,7 @@ sub nsmap { $_[0]->{ nsmap } }
 
 sub register_ns {
 	my $self = shift;
-	my ( $pfx, $uri ) = @_;
+	my ( $uri, $pfx ) = @_;
 	my $_uri = $self->stringify( $uri );
 	$self->nsmap->register( $_uri, $pfx );
 	return XML::Builder::NS->new( $_uri );
