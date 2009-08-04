@@ -81,23 +81,8 @@ sub tag {
 sub root {
 	my $self = shift;
 	my $name = shift;
-	my $attr = $is_hash->( $_[0] ) ? shift : {};
-
-	my $map = $self->nsmap;
-
-	for my $uri ( $map->list ) {
-		my $pfx = $map->prefix_for( $uri );
-		$attr->{ 'xmlns:' . $pfx } = $uri
-			if '' ne $pfx;
-	}
-
-	# if no default NS is declared, explicitly undefine it; this allows
-	# embedding as a fragment into scopes that do have a default namespace
-	# [in 5.10: $attr->{ xmlns } = $map->default // '';]
-	$attr->{ xmlns } = $map->default;
-	$attr->{ xmlns } .= '';
-
-	return $self->tag( $name, $attr, \@_ );
+	my $attr = $self->nsmap->to_attr( $is_hash->( $_[0] ) ? shift : {} );
+	return $self->tag( $name, $attr, \@_ )->as_string;
 }
 
 sub render {
@@ -229,6 +214,27 @@ sub qname {
 		unless '' eq $uri and $is_attr;
 
 	return '' eq $pfx ? $name : "$pfx:$name";
+}
+
+sub to_attr {
+	my $self = shift;
+	my ( $attr ) = @_;
+
+	$attr //= {};
+
+	for my $uri ( $self->list ) {
+		my $pfx = $self->prefix_for( $uri );
+		$attr->{ 'xmlns:' . $pfx } = $uri
+			if '' ne $pfx;
+	}
+
+	# if no default NS is declared, explicitly undefine it; this allows
+	# embedding as a fragment into scopes that do have a default namespace
+	# [in 5.10: $attr->{ xmlns } = $map->default // '';]
+	$attr->{ xmlns } = $self->default;
+	$attr->{ xmlns } .= '';
+
+	return $attr;
 }
 
 
