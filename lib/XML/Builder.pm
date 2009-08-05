@@ -192,8 +192,6 @@ sub prefix_for {
 	return $self->{ $uri };
 }
 
-sub list { grep '-' ne $_, keys %{ $_[0] } }
-
 sub qname {
 	my $self = shift;
 	my ( $name, $is_attr ) = @_;
@@ -222,10 +220,9 @@ sub to_attr {
 
 	$attr //= {};
 
-	for my $uri ( $self->list ) {
-		my $pfx = $self->prefix_for( $uri );
-		$attr->{ 'xmlns:' . $pfx } = $uri
-			if '' ne $pfx;
+	while ( my ( $uri, $pfx ) = each %{ $self } ) {
+		next if '-' eq $uri or '' eq $pfx;
+		$attr->{ 'xmlns:' . $pfx } = $uri;
 	}
 
 	# if no default NS is declared, explicitly undefine it; this allows
