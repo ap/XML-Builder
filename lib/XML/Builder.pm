@@ -225,8 +225,9 @@ sub to_attr {
 		$attr->{ 'xmlns:' . $pfx } = $uri;
 	}
 
-	# if no default NS is declared, explicitly undefine it; this allows
-	# embedding as a fragment into scopes that do have a default namespace
+	# make sure to always declare the default NS (if not bound to a URI, by
+	# explicitly undefining it) to allow embedding the XML easily without
+	# having to parse the fragment
 	# [in 5.10: $attr->{ xmlns } = $map->default // '';]
 	$attr->{ xmlns } = $self->default;
 	$attr->{ xmlns } .= '';
