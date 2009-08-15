@@ -30,6 +30,7 @@ sub clone {
 
 sub nsmap     { $_[0]->{ nsmap } }
 sub as_string { $_[0]->{ content } }
+sub encoding  { $_[0]->{ encoding } }
 
 sub register_ns {
 	my $self = shift;
@@ -93,7 +94,20 @@ sub render {
 	my $is_obj     = $t && Scalar::Util::blessed $r;
 	my $is_arefref = 'REF' eq $t && 'ARRAY' eq ref $$r;
 
-	return $r->as_string if $is_obj and $r->isa( __PACKAGE__ );
+	if ( $is_obj and $r->isa( __PACKAGE__ ) ) {
+		my ( $self_enc, $r_enc ) = map { lc } $self->encoding, $r->encoding;
+
+		return $r->as_string
+			if $self_enc eq $r_enc
+			# be more permissive: ASCII is one-way compatible with UTF-8 and Latin-1
+			or 'us-ascii' eq $r_enc and grep { $_ eq $self_enc } 'utf-8', 'iso-8859-1';
+
+		$croak->(
+			'Cannot merge XML::Builder fragments'
+			. ' with incompatible encodings'
+			. " (have $self_enc, fragment has $r_enc)"
+		);
+	}
 
 	return
 		  'ARRAY' eq $t   ? ( join '', map $self->render( $_ ), grep defined, @$r )
