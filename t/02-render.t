@@ -17,4 +17,4 @@ sub tag {
 }
 
 isa_ok my $mx = Mock::XML::Builder->new, 'Mock::XML::Builder';
-is $mx->render( \$arg ), $x->tag( @$arg ), 'render results identical with tag';
+is $mx->render( \$arg )->as_string, $x->tag( @$arg )->as_string, 'render results identical with tag';

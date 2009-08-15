@@ -6,16 +6,16 @@ isa_ok my $x = XML::Builder->new, 'XML::Builder';
 
 # Tag options
 
-is $x->tag( 'br' ), '<br/>', 'simple closed tag';
-is $x->tag( 'b', '' ), '<b></b>', 'simple forced open-close pair tag';
-is $x->tag( 'b', 'a', 'b' ), '<b>a</b><b>b</b>', 'distributivity';
-is $x->tag( 'b', [ 'a', 'b' ] ), '<b>ab</b>', 'distributivity escape';
-is $x->tag( 'p', $x->tag( 'b', 'a', 'b' ) ), '<p><b>a</b></p><p><b>b</b></p>', 'distributivity w/ nesting';
-is $x->tag( 'p', $x->tag( 'b', [ 'a', 'b' ] ) ), '<p><b>ab</b></p>', 'distributivity escape w/in nesting';
+is $x->tag( 'br' )->as_string, '<br/>', 'simple closed tag';
+is $x->tag( 'b', '' )->as_string, '<b></b>', 'simple forced open-close pair tag';
+is $x->tag( 'b', 'a', 'b' )->as_string, '<b>a</b><b>b</b>', 'distributivity';
+is $x->tag( 'b', [ 'a', 'b' ] )->as_string, '<b>ab</b>', 'distributivity escape';
+is $x->tag( 'p', $x->tag( 'b', 'a', 'b' ) )->as_string, '<p><b>a</b></p><p><b>b</b></p>', 'distributivity w/ nesting';
+is $x->tag( 'p', $x->tag( 'b', [ 'a', 'b' ] ) )->as_string, '<p><b>ab</b></p>', 'distributivity escape w/in nesting';
 
 # Attributes
 
-is $x->tag( 'p', { class => 'normal' }, '' ), '<p class="normal"></p>', 'attributes';
-is $x->tag( 'p', { class => 'normal', style => undef }, '' ), '<p class="normal"></p>', 'skipping undefined attribute values';
-is $x->tag( 'p', { class => 'small' }, 'a', 'b' ), '<p class="small">a</p><p class="small">b</p>', 'attributes distribute properly';
-is $x->tag( 'p', { class => 'small', id => 'p1' }, 'a', { class => undef, id => 'p2' }, 'b' ), '<p class="small" id="p1">a</p><p id="p2">b</p>', 'overriding attribute values during distribution';
+is $x->tag( 'p', { class => 'normal' }, '' )->as_string, '<p class="normal"></p>', 'attributes';
+is $x->tag( 'p', { class => 'normal', style => undef }, '' )->as_string, '<p class="normal"></p>', 'skipping undefined attribute values';
+is $x->tag( 'p', { class => 'small' }, 'a', 'b' )->as_string, '<p class="small">a</p><p class="small">b</p>', 'attributes distribute properly';
+is $x->tag( 'p', { class => 'small', id => 'p1' }, 'a', { class => undef, id => 'p2' }, 'b' )->as_string, '<p class="small" id="p1">a</p><p id="p2">b</p>', 'overriding attribute values during distribution';
