@@ -1,0 +1,5 @@
+* Tests for the namespace stuff
+* Tests for `root`
+* Methods to emit processing instructions and comments
+* Check XML TR and add checks for valid char ranges and such in various places
+* Docs
