@@ -6,7 +6,8 @@ use strict;
 use Encode ();
 use Scalar::Util ();
 
-our $VERSION = '1.0000';
+our $VERSION = '1.0001';
+$VERSION = eval $VERSION;
 
 # XXX probably should be replaced with Params::Util?
 our $is_hash = sub {
