@@ -39,7 +39,7 @@ sub register_ns {
 	my ( $uri, $pfx ) = @_;
 	my $_uri = $self->stringify( $uri );
 	$self->nsmap->register( $_uri, $pfx );
-	return XML::Builder::NS->new( $_uri );
+	return XML::Builder::NS->new( $self, $_uri );
 }
 
 sub tag {
@@ -283,15 +283,25 @@ sub to_attr {
 
 package XML::Builder::NS;
 
-use overload '""' => sub { ${$_[0]} };
+use overload '""' => sub { $_[0]{ 'uri' } };
 
-sub new { bless \do { my $uri = $_[1] }, $_[0] }
+sub new {
+	my $class = shift;
+	my ( $xb, $uri ) = @_;
+	return bless { uri => $uri, xb => $xb }, $class;
+}
 
-sub qname { '{' . ${$_[0]} . '}' . $_[1] }
+for my $meth ( qw( tag root document ) ) {
+	my $code = sub {
+		my $self = shift;
+		my $tag = shift;
+		$self->{ 'xb' }->$meth( [ $self->{ 'uri' }, $tag ], @_ );
+	};
+	no strict 'refs';
+	*{ "_$meth" } = $code;
+}
 
-sub qpair { my $self = shift; [ $$self, $_[0] ] }
-
-sub AUTOLOAD { our $AUTOLOAD =~ /.*::(.*)/; shift->qpair( $1 ) }
+sub AUTOLOAD { our $AUTOLOAD =~ /.*::(.*)/; shift->_tag( $1, @_ ) }
 
 
 1;
