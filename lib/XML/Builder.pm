@@ -153,7 +153,7 @@ sub flatten_cdata {
 
 package XML::Builder::NSMap;
 
-sub new { bless {}, shift }
+sub new { bless { '' => '', '-' => '' }, shift }
 
 sub default { $_[0]->{ '-' } }
 
