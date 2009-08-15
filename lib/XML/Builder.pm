@@ -193,9 +193,16 @@ sub adopt {
 
 package XML::Builder::NSMap;
 
-sub new { bless { '' => '', '-' => '' }, shift }
+sub new {
+	return bless {
+		''         => '',
+		'-default' => '',
+		'-counter' => 1,
+		'-pfx'     => { '' => 1 },
+	}, shift
+}
 
-sub default { $_[0]->{ '-' } }
+sub default { $_[0]->{ '-default' } }
 
 sub register {
 	my $self = shift;
@@ -211,11 +218,12 @@ sub register {
 	}
 	else {
 		my $letter = ( $uri =~ m!([[:alpha:]])[^/]*/?\z! ) ? lc $1 : 'ns';
-		$pfx = $letter . ( 1 + keys %$self );
+		do { $pfx = $letter . $self->{ '-counter' }++ } while exists $self->{ '-pfx' }{ $pfx };
 	}
 
 	$self->{ $uri } = $pfx;
-	$self->{ '-' } = $uri if '' eq $pfx;
+	$self->{ '-pfx' }{ $pfx } = 1;
+	$self->{ '-default' } = $uri if '' eq $pfx;
 
 	return $self;
 }
@@ -256,7 +264,7 @@ sub to_attr {
 	$attr //= {};
 
 	while ( my ( $uri, $pfx ) = each %{ $self } ) {
-		next if '-' eq $uri or '' eq $pfx;
+		next if $uri =~ /^-/ or '' eq $pfx;
 		$attr->{ 'xmlns:' . $pfx } = $uri;
 	}
 
