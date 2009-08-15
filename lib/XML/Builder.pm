@@ -28,7 +28,8 @@ sub clone {
 	return bless { %$self, @_ }, ref $self;
 }
 
-sub nsmap { $_[0]->{ nsmap } }
+sub nsmap     { $_[0]->{ nsmap } }
+sub as_string { $_[0]->{ content } }
 
 sub register_ns {
 	my $self = shift;
@@ -146,11 +147,6 @@ sub flatten_cdata {
 	$croak->( 'Incomplete CDATA section' ) if -1 < index $str, '<![CDATA[';
 	return $str;
 }
-
-# in 5.10:
-#sub as_string { $_[0]->{ content } // () }
-sub as_string { my $c = $_[0]->{ content }; defined $c ? $c : () }
-
 
 
 #######################################################################
