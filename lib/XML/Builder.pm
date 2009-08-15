@@ -84,7 +84,10 @@ sub root {
 	my $self = shift;
 	my $name = shift;
 	my $attr = $self->nsmap->to_attr( $is_hash->( $_[0] ) ? shift : {} );
-	return $self->tag( $name, $attr, \@_ )->as_string;
+	my $enc  = $self->encoding;
+	return
+		qq{<?xml version="1.0" encoding="$enc"?>\n}
+		. $self->tag( $name, $attr, \@_ )->as_string;
 }
 
 sub render {
