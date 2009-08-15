@@ -29,9 +29,10 @@ sub clone {
 	return bless { %$self, @_ }, ref $self;
 }
 
-sub nsmap     { $_[0]->{ nsmap } }
-sub as_string { $_[0]->{ content } }
-sub encoding  { $_[0]->{ encoding } }
+sub nsmap      { $_[0]->{ nsmap } }
+sub as_string  { $_[0]->{ content } }
+sub encoding   { $_[0]->{ encoding } }
+sub root_class { 'XML::Builder::Document' }
 
 sub register_ns {
 	my $self = shift;
@@ -84,10 +85,14 @@ sub root {
 	my $self = shift;
 	my $name = shift;
 	my $attr = $self->nsmap->to_attr( $is_hash->( $_[0] ) ? shift : {} );
-	my $enc  = $self->encoding;
-	return
-		qq{<?xml version="1.0" encoding="$enc"?>\n}
-		. $self->tag( $name, $attr, \@_ )->as_string;
+	return $self->root_class->adopt( $self->tag( $name, $attr, \@_ ) );
+}
+
+sub preamble { qq(<?xml version="1.0" encoding="${\shift->encoding}"?>\n) }
+
+sub document {
+	my $self = shift;
+	return $self->preamble . $self->root( @_ );
 }
 
 sub render {
@@ -100,6 +105,10 @@ sub render {
 
 	if ( $is_obj and $r->isa( __PACKAGE__ ) ) {
 		my ( $self_enc, $r_enc ) = map { lc } $self->encoding, $r->encoding;
+
+		$croak->( 'Cannot merge XML::Builder fragments built with different namespace maps' )
+			if $self->nsmap != $r->nsmap
+			and not $r->isa( $self->root_class );
 
 		return $r->as_string
 			if $self_enc eq $r_enc
@@ -166,6 +175,19 @@ sub flatten_cdata {
 	return $str;
 }
 
+
+#######################################################################
+
+package XML::Builder::Document;
+
+use parent 'XML::Builder';
+use overload '""' => 'as_string';
+
+sub adopt {
+	my $class = shift;
+	my ( $obj ) = @_;
+	return bless $obj, $class;
+}
 
 #######################################################################
 
