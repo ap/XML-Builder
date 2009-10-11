@@ -22,14 +22,14 @@ use overload '""' => sub { 'ignore me' };
 }
 
 my $obj1 = SomeClass->new;
-eval { $x->tag( 'p', $obj1 ) };
+eval { $x->stringify( $obj1 ) };
 like $@, qr/^Unstringifiable object SomeClass=/, 'reject random objects';
 
 my $obj2 = SomeClass::AsStr->new;
-is $x->tag( 'p', $obj2 )->as_string, '<p>an object</p>', 'explicit object stringification';
+is $x->stringify( $obj2 ), 'an object', 'explicit object stringification';
 
 my $obj3 = SomeClass::Overload->new;
-is $x->tag( 'p', $obj3 )->as_string, '<p>no really</p>', 'implicit object stringification';
+is $x->stringify( $obj3 ), 'no really', 'implicit object stringification';
 
 my $obj4 = SomeClass::AsStr::Overload->new;
-is $x->tag( 'p', $obj4 )->as_string, '<p>an object</p>', 'explicit object stringification preferred';
+is $x->stringify( $obj4 ), 'an object', 'explicit object stringification preferred';

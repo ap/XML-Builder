@@ -1,91 +1,171 @@
-my $croak = sub { require Carp; goto &Carp::croak }; # file scope!
-
 package XML::Builder;
 
 use strict;
 use Encode ();
 use Scalar::Util ();
+use Carp ();
+
+use Object::Tiny qw( nsmap pfxmap default_ns encoding );
 
 our $VERSION = '1.0001';
 $VERSION = eval $VERSION;
 
-# XXX probably should be replaced with Params::Util?
-our $is_hash = sub {
-	my ( $scalar ) = @_;
-	return 'HASH' eq ref $scalar and not Scalar::Util::blessed $scalar;
-};
+sub fragment_class { 'XML::Builder::Fragment' }
+sub unsafe_class   { 'XML::Builder::Fragment::Unsafe' }
+sub tag_class      { 'XML::Builder::Fragment::Tag' }
+sub doc_class      { 'XML::Builder::Fragment::Document' }
 
 sub new {
 	return bless {
 		encoding => 'us-ascii',
-		content  => undef,
-		nsmap    => XML::Builder::NSMap->new(), # CRUCIAL: must be shared by all clones!
+		nsmap    => {},
+		counter  => 1,
+		pfxmap   => { '' => 1 },
 		@_
-	}, shift
+	}, shift;
 }
-
-sub clone {
-	my $self = shift;
-	return bless { %$self, @_ }, ref $self;
-}
-
-sub nsmap      { $_[0]->{ nsmap } }
-sub as_string  { $_[0]->{ content } }
-sub encoding   { $_[0]->{ encoding } }
-sub root_class { 'XML::Builder::Document' }
 
 sub register_ns {
 	my $self = shift;
 	my ( $uri, $pfx ) = @_;
-	my $_uri = $self->stringify( $uri );
-	$self->nsmap->register( $_uri, $pfx );
-	return XML::Builder::NS->new( $self, $_uri );
+
+	my $nsmap = $self->nsmap;
+
+	$uri = $self->stringify( $uri );
+
+	if ( exists $nsmap->{ $uri } ) {
+		my $registered_pfx = $nsmap->{ $uri };
+
+		Carp::croak( "Namespace '$uri' being bound to '$pfx' is already bound to '$registered_pfx'" )
+			if defined $pfx and $pfx ne $registered_pfx;
+
+		return $self->pfxmap->{ $registered_pfx };
+	}
+
+	if ( not defined $pfx ) {
+		my $letter = ( $uri =~ m!([[:alpha:]])[^/]*/?\z! ) ? lc $1 : 'ns';
+		do { $pfx = $letter . $self->{ 'counter' }++ } while exists $self->pfxmap->{ $pfx };
+	}
+
+	# FIXME needs proper validity check per XML TR
+	Carp::croak( "Invalid namespace prefix '$pfx'" )
+		if length $pfx and $pfx !~ /[\w-]/;
+
+	my $ns = XML::Builder::QName->new( $self, $uri );
+
+	$self->{ 'default_ns' } = $uri if '' eq $pfx;
+	$nsmap->{ $uri } = $pfx;
+	$self->pfxmap->{ $pfx } = $ns;
+
+	return $ns;
+}
+
+sub prefix_for_uri {
+	my $self = shift;
+	my ( $uri ) = @_;
+	$self->register_ns( $uri ) if not exists $self->nsmap->{ $uri };
+	return $self->{ $uri };
+}
+
+sub null_ns { shift->register_ns( '', '' ) }
+
+sub parse_qname {
+	my $self = shift;
+	my ( $name ) = @_;
+
+	my $uri = '';
+
+	if ( 'ARRAY' eq ref $name ) {
+		( $name, $uri ) = @$name;
+	}
+	elsif ( $name =~ s/\A\{([^}]+)\}// ) {
+		$uri = $1;
+	}
+
+	return ( $name, $uri );
+}
+
+sub qname {
+	my $self = shift;
+	my ( $name, $uri, $is_attr ) = @_;
+
+	# attributes without a prefix are in the null namespace,
+	# not in the default namespace, so never put a prefix on
+	# attributes in the null namespace
+	my $pfx = ( '' eq $uri and $is_attr ) ? '' : $self->prefix_for_uri( $uri );
+
+	return '' eq $pfx ? $name : "$pfx:$name";
+}
+
+sub nsmap_to_attr {
+	my $self = shift;
+	my ( $attr ) = @_;
+
+	$attr //= {};
+
+	while ( my ( $uri, $pfx ) = each %{ $self->nsmap } ) {
+		next if '' eq $pfx;
+		$attr->{ 'xmlns:' . $pfx } = $uri;
+	}
+
+	# make sure to always declare the default NS (if not bound to a URI, by
+	# explicitly undefining it) to allow embedding the XML easily without
+	# having to parse the fragment
+	# [in 5.10: $attr->{ xmlns } = $map->default_ns // '';]
+	$attr->{ xmlns } = $self->default_ns;
+	$attr->{ xmlns } .= '';
+
+	return $attr;
 }
 
 sub tag {
 	my $self = shift;
 	my $name = shift;
 
-	my $qname = $self->nsmap->qname( $name );
-	my $tag   = $qname;
+	my ( $name, $uri ) = $self->parse_qname( $name );
+
 	my %attr  = ();
 	my @out   = ();
+
+	# XXX probably should be replaced with Params::Util?
+	my $is_hash = sub {
+		my ( $scalar ) = @_;
+		return 'HASH' eq ref $scalar and not Scalar::Util::blessed $scalar;
+	};
 
 	do {
 		# are there attributes to process?
 		if ( @_ and $is_hash->( $_[0] ) ) {
 			my $new_attr = shift @_;
-			while ( my ( $k, $v ) = each %$new_attr ) { # merge
-				defined $v ?$attr{ $k } = $v : delete $attr{ $k };
+			@attr{ keys %$new_attr } = values %$new_attr;
+			while ( my ( $k, $v ) = each %attr ) {
+				delete $attr{ $k } if not defined $v;
 			}
-			# re-render tag
-			$tag = join ' ', $qname,
-				map { sprintf '%s="%s"', $self->nsmap->qname( $_, 1 ), $self->escape_attr( $attr{ $_ } ) }
-				sort keys %attr;
 		}
 
-		# what content will this tag have, if any?
-		my $content;
-		if ( @_ and not $is_hash->( $_[0] ) ) {
-			$content = shift;
-			$content = $self->render( $content ) if defined $content;
-		}
+		my $content = ( @_ and not $is_hash->( $_[0] ) ) ? shift : undef;
 
 		# assemble markup fragment
-		push @out, defined $content ? "<$tag>$content</$qname>" : "<$tag/>";
+		push @out, $self->tag_class->new(
+			name    => $name,
+			ns      => $uri,
+			attr    => { %attr },
+			content => $content,
+			builder => $self,
+		);
 
 	} while @_;
 
-	return wantarray
-		? map { $self->clone( content => $_ ) } @out
-		: $self->clone( content => join '', @out );
+	return $self->fragment_class->new( builder => $self, content => \@out )
+		if @out > 1 and not wantarray;
+
+	return @out[ 0 .. $#out ];
 }
 
 sub root {
 	my $self = shift;
-	my $name = shift;
-	my $attr = $self->nsmap->to_attr( $is_hash->( $_[0] ) ? shift : {} );
-	return $self->root_class->adopt( $self->tag( $name, $attr, \@_ ) );
+	my ( $tag ) = @_;
+	return $self->doc_class->adopt( $tag );
 }
 
 sub preamble { qq(<?xml version="1.0" encoding="${\shift->encoding}"?>\n) }
@@ -93,6 +173,12 @@ sub preamble { qq(<?xml version="1.0" encoding="${\shift->encoding}"?>\n) }
 sub document {
 	my $self = shift;
 	return $self->preamble . $self->root( @_ );
+}
+
+sub unsafe {
+	my $self = shift;
+	my ( $string ) = @_;
+	return $self->unsafe_class->new( builder => $self, content => $string );
 }
 
 sub render {
@@ -103,19 +189,19 @@ sub render {
 	my $is_obj     = $t && Scalar::Util::blessed $r;
 	my $is_arefref = 'REF' eq $t && 'ARRAY' eq ref $$r;
 
-	if ( $is_obj and $r->isa( __PACKAGE__ ) ) {
-		my ( $self_enc, $r_enc ) = map { lc } $self->encoding, $r->encoding;
+	if ( $is_obj and $r->isa( $self->fragment_class ) ) {
+		my ( $self_enc, $r_enc ) = map { lc $_->encoding } $self, $r->builder;
 
-		$croak->( 'Cannot merge XML::Builder fragments built with different namespace maps' )
-			if $self->nsmap != $r->nsmap
-			and not $r->isa( $self->root_class );
+		Carp::croak( 'Cannot merge XML::Builder fragments built with different namespace maps' )
+			if $self != $r->builder
+			and $r->depends_ns_scope;
 
 		return $r->as_string
 			if $self_enc eq $r_enc
 			# be more permissive: ASCII is one-way compatible with UTF-8 and Latin-1
 			or 'us-ascii' eq $r_enc and grep { $_ eq $self_enc } 'utf-8', 'iso-8859-1';
 
-		$croak->(
+		Carp::croak(
 			'Cannot merge XML::Builder fragments'
 			. ' with incompatible encodings'
 			. " (have $self_enc, fragment has $r_enc)"
@@ -125,7 +211,7 @@ sub render {
 	return
 		  'ARRAY' eq $t   ? ( join '', map $self->render( $_ ), grep defined, @$r )
 		: $is_arefref     ? scalar $self->tag( @$$r )
-		: $t && ! $is_obj ? $croak->( 'Unknown type of reference ', $t )
+		: $t && ! $is_obj ? Carp::croak( 'Unknown type of reference ', $t )
 		: defined $r      ? $self->escape_text( $self->stringify( $r ) )
 		: ();
 }
@@ -164,144 +250,119 @@ sub stringify {
 	my $conv = $thing->can( 'as_string' ) || overload::Method( $thing, '""' );
 	return $conv->( $thing ) if $conv;
 
-	$croak->( 'Unstringifiable object ', $thing );
+	Carp::croak( 'Unstringifiable object ', $thing );
 }
 
 sub flatten_cdata {
 	my $self = shift;
 	my ( $str ) = @_;
 	$str =~ s{<!\[CDATA\[(.*?)]]>}{ $self->escape_text( $1 ) }gse;
-	$croak->( 'Incomplete CDATA section' ) if -1 < index $str, '<![CDATA[';
+	Carp::croak( 'Incomplete CDATA section' ) if -1 < index $str, '<![CDATA[';
 	return $str;
 }
 
+#######################################################################
+
+package XML::Builder::QName;
+
+use overload '""' => sub { $_[0]{'uri'} };
+
+sub AUTOLOAD {
+	our $AUTOLOAD =~ /.*::(.*)/;
+	splice @_, 1, 0, $1;
+	goto &_tag;
+}
+
+sub new {
+	my $class = shift;
+	my %self;
+	@self{ qw( builder uri ) } = @_;
+	return bless \%self, $class;
+}
+
+sub _tag {
+	my $self = shift;
+	my $name = shift;
+	my ( $builder, $uri ) = @{$self}{ qw( builder uri ) };
+	return $builder->tag( [ $name, $uri ], @_ );
+}
 
 #######################################################################
 
-package XML::Builder::Document;
+package XML::Builder::Fragment;
 
-use parent 'XML::Builder';
+use Object::Tiny qw( builder content );
+
+sub depends_ns_scope { 0 }
+
+sub as_string {
+	my $self = shift;
+	return $self->builder->render( $self->content );
+}
+
+#######################################################################
+
+package XML::Builder::Fragment::Unsafe;
+
+use parent -norequire => 'XML::Builder::Fragment';
+
+sub as_string { shift->content }
+
+#######################################################################
+
+package XML::Builder::Fragment::Tag;
+
+use parent -norequire => 'XML::Builder::Fragment';
+use Object::Tiny qw( name ns attr );
+use overload '""' => 'as_clarkname';
+
+sub depends_ns_scope { 1 }
+
+sub clone {
+	my $self = shift;
+	return bless { %$self, @_ }, ref $self;
+}
+
+sub as_string {
+	my $self = shift;
+
+	my $builder = $self->builder;
+	my $qname   = $builder->qname( $self->name, $self->ns );
+	my $attr    = $self->attr // {};
+
+	my $tag = join ' ', $qname,
+		map { sprintf '%s="%s"', $builder->qname( $builder->parse_qname( $_ ), 1 ), $builder->escape_attr( $attr->{ $_ } ) }
+		sort keys %$attr;
+
+	return defined $self->content
+		? "<$tag>" . $self->SUPER::as_string . "</$qname>"
+		: "<$tag/>";
+}
+
+sub as_clarkname {
+	my $self = shift;
+	my $name = $self->name;
+	my $ns = $self->ns;
+	return $name if not defined $ns;
+	return "{$ns}$name";
+}
+
+#######################################################################
+
+package XML::Builder::Fragment::Document;
+
+use parent -norequire => 'XML::Builder::Fragment::Tag';
 use overload '""' => 'as_string';
+
+sub depends_ns_scope { 0 }
 
 sub adopt {
 	my $class = shift;
 	my ( $obj ) = @_;
+	$obj->builder->nsmap_to_attr( $obj->attr );
 	return bless $obj, $class;
 }
 
 #######################################################################
-
-package XML::Builder::NSMap;
-
-sub new {
-	return bless {
-		''         => '',
-		'-default' => '',
-		'-counter' => 1,
-		'-pfx'     => { '' => 1 },
-	}, shift
-}
-
-sub default { $_[0]->{ '-default' } }
-
-sub register {
-	my $self = shift;
-	my ( $uri, $pfx ) = @_;
-
-	if ( defined $pfx ) {
-		# FIXME needs proper validity check per XML TR
-		$croak->( "Invalid namespace prefix '$pfx'" )
-			if length $pfx and $pfx !~ /[\w-]/;
-
-		$croak->( "Namespace '$uri' being bound to '$pfx' is already bound to '$self->{ $uri }'" )
-			if exists $self->{ $uri };
-	}
-	else {
-		my $letter = ( $uri =~ m!([[:alpha:]])[^/]*/?\z! ) ? lc $1 : 'ns';
-		do { $pfx = $letter . $self->{ '-counter' }++ } while exists $self->{ '-pfx' }{ $pfx };
-	}
-
-	$self->{ $uri } = $pfx;
-	$self->{ '-pfx' }{ $pfx } = 1;
-	$self->{ '-default' } = $uri if '' eq $pfx;
-
-	return $self;
-}
-
-sub prefix_for {
-	my $self = shift;
-	my ( $uri ) = @_;
-	$self->register( $uri ) if not exists $self->{ $uri };
-	return $self->{ $uri };
-}
-
-sub qname {
-	my $self = shift;
-	my ( $name, $is_attr ) = @_;
-
-	my $uri = my $pfx = '';
-
-	if ( 'ARRAY' eq ref $name ) {
-		( $uri, $name ) = @$name;
-	}
-	elsif ( $name =~ s/\A\{([^}]+)\}// ) {
-		$uri = $1;
-	}
-
-	# attributes without a prefix are in the null namespace,
-	# not in the default namespace, so never put a prefix on
-	# attributes in the null namespace
-	$pfx = $self->prefix_for( $uri )
-		unless '' eq $uri and $is_attr;
-
-	return '' eq $pfx ? $name : "$pfx:$name";
-}
-
-sub to_attr {
-	my $self = shift;
-	my ( $attr ) = @_;
-
-	$attr //= {};
-
-	while ( my ( $uri, $pfx ) = each %{ $self } ) {
-		next if $uri =~ /^-/ or '' eq $pfx;
-		$attr->{ 'xmlns:' . $pfx } = $uri;
-	}
-
-	# make sure to always declare the default NS (if not bound to a URI, by
-	# explicitly undefining it) to allow embedding the XML easily without
-	# having to parse the fragment
-	# [in 5.10: $attr->{ xmlns } = $map->default // '';]
-	$attr->{ xmlns } = $self->default;
-	$attr->{ xmlns } .= '';
-
-	return $attr;
-}
-
-
-#######################################################################
-
-package XML::Builder::NS;
-
-use overload '""' => sub { $_[0]{ 'uri' } };
-
-sub new {
-	my $class = shift;
-	my ( $xb, $uri ) = @_;
-	return bless { uri => $uri, xb => $xb }, $class;
-}
-
-for my $meth ( qw( tag root document ) ) {
-	my $code = sub {
-		my $self = shift;
-		my $tag = shift;
-		$self->{ 'xb' }->$meth( [ $self->{ 'uri' }, $tag ], @_ );
-	};
-	no strict 'refs';
-	*{ "_$meth" } = $code;
-}
-
-sub AUTOLOAD { our $AUTOLOAD =~ /.*::(.*)/; shift->_tag( $1, @_ ) }
-
 
 1;

@@ -6,7 +6,12 @@ my $builder = Module::Build->new(
 	module_name        => 'XML::Builder',
 	license            => 'perl',
 	dist_author        => 'Aristotle Pagaltzis <pagaltzis@gmx.de>',
-	requires           => {},
+	requires           => {
+		'Scalar::Util' => 0,
+		Encode         => 0,
+		parent         => 0,
+		'Object::Tiny' => 0,
+	},
 	build_requires     => { 'Test::More' => 0 },
 	add_to_cleanup     => [ 'XML-Builder-*' ],
 	create_makefile_pl => 'traditional',
