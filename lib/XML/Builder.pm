@@ -235,7 +235,7 @@ sub render {
 			my $self = shift;
 			my $str = $self->stringify( shift );
 			$str =~ s{ $specials_rx }{ $XML_NCR{$1} }gex;
-			return Encode::encode $self->{ 'encoding' }, $str, Encode::HTMLCREF;
+			return Encode::encode $self->encoding, $str, Encode::HTMLCREF;
 		}
 	}
 }
