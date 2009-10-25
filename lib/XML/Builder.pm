@@ -124,7 +124,7 @@ sub tag {
 
 	my ( $name, $uri ) = $self->parse_qname( $name );
 
-	my %attr  = ();
+	my $attr  = {};
 	my @out   = ();
 
 	# XXX probably should be replaced with Params::Util?
@@ -137,9 +137,10 @@ sub tag {
 		# are there attributes to process?
 		if ( @_ and $is_hash->( $_[0] ) ) {
 			my $new_attr = shift @_;
-			@attr{ keys %$new_attr } = values %$new_attr;
-			while ( my ( $k, $v ) = each %attr ) {
-				delete $attr{ $k } if not defined $v;
+			$attr = {};
+			@{ $attr }{ keys %$new_attr } = values %$new_attr;
+			while ( my ( $k, $v ) = each %$attr ) {
+				delete $attr->{ $k } if not defined $v;
 			}
 		}
 
@@ -149,7 +150,7 @@ sub tag {
 		push @out, $self->tag_class->new(
 			name    => $name,
 			ns      => $uri,
-			attr    => { %attr },
+			attr    => $attr,
 			content => $content,
 			builder => $self,
 		);
