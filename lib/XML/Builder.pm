@@ -230,13 +230,13 @@ sub render {
 	);
 
 	while ( my ( $subname, $specials_rx ) = each %type ) {
-		my $slot = do { no strict 'refs'; \*{ $subname } };
-		*$slot = sub {
+		# using eval instead of closures to avoid __ANON__
+		eval 'sub '.$subname.' {
 			my $self = shift;
 			my $str = $self->stringify( shift );
-			$str =~ s{ $specials_rx }{ $XML_NCR{$1} }gex;
+			$str =~ s{ '.$specials_rx.' }{ $XML_NCR{$1} }gex;
 			return Encode::encode $self->encoding, $str, Encode::HTMLCREF;
-		}
+		}';
 	}
 }
 
