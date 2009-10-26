@@ -319,11 +319,6 @@ use overload '""' => 'as_clarkname';
 
 sub depends_ns_scope { 1 }
 
-sub clone {
-	my $self = shift;
-	return bless { %$self, @_ }, ref $self;
-}
-
 sub as_string {
 	my $self = shift;
 
