@@ -101,7 +101,7 @@ sub nsmap_to_attr {
 	my $self = shift;
 	my ( $attr ) = @_;
 
-	$attr //= {};
+	$attr ||= {};
 
 	while ( my ( $uri, $pfx ) = each %{ $self->nsmap } ) {
 		next if '' eq $pfx;
@@ -324,7 +324,7 @@ sub as_string {
 
 	my $builder = $self->builder;
 	my $qname   = $builder->qname( $self->name, $self->ns );
-	my $attr    = $self->attr // {};
+	my $attr    = $self->attr || {};
 
 	my $tag = join ' ', $qname,
 		map { sprintf '%s="%s"', $builder->qname( $builder->parse_qname( $_ ), 1 ), $builder->escape_attr( $attr->{ $_ } ) }
@@ -355,6 +355,7 @@ sub depends_ns_scope { 0 }
 sub adopt {
 	my $class = shift;
 	my ( $obj ) = @_;
+	$obj->{ 'attr' } ||= {};
 	$obj->builder->nsmap_to_attr( $obj->attr );
 	return bless $obj, $class;
 }
