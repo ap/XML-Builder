@@ -20,7 +20,7 @@ sub new {
 		encoding => 'us-ascii',
 		nsmap    => {},
 		counter  => 1,
-		pfxmap   => { '' => 1 },
+		pfxmap   => {},
 		@_
 	}, shift;
 }
@@ -43,6 +43,10 @@ sub register_ns {
 	}
 
 	if ( not defined $pfx ) {
+		if ( $uri eq '' and not exists $self->pfxmap->{ '' } ) {
+			return $self->register_ns( '', '' );
+		}
+
 		my $letter = ( $uri =~ m!([[:alpha:]])[^/]*/?\z! ) ? lc $1 : 'ns';
 		do { $pfx = $letter . $self->{ 'counter' }++ } while exists $self->pfxmap->{ $pfx };
 	}
@@ -64,7 +68,7 @@ sub prefix_for_uri {
 	my $self = shift;
 	my ( $uri ) = @_;
 	$self->register_ns( $uri ) if not exists $self->nsmap->{ $uri };
-	return $self->{ $uri };
+	return $self->nsmap->{ $uri };
 }
 
 sub null_ns { shift->register_ns( '', '' ) }
@@ -77,6 +81,7 @@ sub parse_qname {
 
 	if ( 'ARRAY' eq ref $name ) {
 		( $name, $uri ) = @$name;
+		$uri = '' if not defined $uri;
 	}
 	elsif ( $name =~ s/\A\{([^}]+)\}// ) {
 		$uri = $1;
