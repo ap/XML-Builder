@@ -13,6 +13,7 @@ $VERSION = eval $VERSION;
 sub fragment_class { 'XML::Builder::Fragment' }
 sub unsafe_class   { 'XML::Builder::Fragment::Unsafe' }
 sub tag_class      { 'XML::Builder::Fragment::Tag' }
+sub tagleaf_class  { 'XML::Builder::Fragment::TagLeaf' }
 sub doc_class      { 'XML::Builder::Fragment::Document' }
 
 sub new {
@@ -123,43 +124,77 @@ sub nsmap_to_attr {
 	return $attr;
 }
 
+my $is_raw_hash = sub {
+	my ( $scalar ) = @_;
+	return 'HASH' eq ref $scalar and not Scalar::Util::blessed $scalar;
+};
+
+my $merge_hash = sub {
+	my ( $cur, $new ) = @_;
+	@{ $cur }{ keys %$new } = values %$new;
+	while ( my ( $k, $v ) = each %$cur ) {
+		delete $cur->{ $k } if not defined $v;
+	}
+};
+
 sub tag {
+	my $self = shift;
+
+	if ( 'SCALAR' eq ref $_[0] and 'foreach' eq ${$_[0]} ) {
+		shift @_; # throw away
+		return $self->tag_foreach( @_ );
+	}
+
+	my $name = shift;
+	my ( $name, $uri ) = $self->parse_qname( $name );
+
+	if ( not @_ ) {
+		return $self->tagleaf_class->new(
+			name    => $name,
+			ns      => $uri,
+			builder => $self,
+		);
+	}
+
+	my $attr = {};
+	$merge_hash->( $attr, shift @_ ) if $is_raw_hash->( $_[0] );
+
+	return $self->tag_class->new(
+		name    => $name,
+		ns      => $uri,
+		attr    => $attr,
+		content => [ map $self->render( $_ ), @_ ],
+		builder => $self,
+	);
+}
+
+sub tag_foreach {
 	my $self = shift;
 	my $name = shift;
 
 	my ( $name, $uri ) = $self->parse_qname( $name );
 
-	my $attr  = {};
-	my @out   = ();
+	if ( not @_ ) {
+		return $self->tagleaf_class->new(
+			name    => $name,
+			ns      => $uri,
+			builder => $self,
+		);
+	}
 
-	# XXX probably should be replaced with Params::Util?
-	my $is_hash = sub {
-		my ( $scalar ) = @_;
-		return 'HASH' eq ref $scalar and not Scalar::Util::blessed $scalar;
-	};
+	my $attr = {};
+	my @out  = ();
 
 	do {
-		# are there attributes to process?
-		if ( @_ and $is_hash->( $_[0] ) ) {
-			my $new_attr = shift @_;
-			$attr = {};
-			@{ $attr }{ keys %$new_attr } = values %$new_attr;
-			while ( my ( $k, $v ) = each %$attr ) {
-				delete $attr->{ $k } if not defined $v;
-			}
-		}
-
-		my $content = ( @_ and not $is_hash->( $_[0] ) ) ? shift : undef;
-
-		# assemble markup fragment
+		$merge_hash->( $attr, shift @_ ) if $is_raw_hash->( $_[0] );
+		my $content = ( not $is_raw_hash->( $_[0] ) ) ? shift : undef;
 		push @out, $self->tag_class->new(
 			name    => $name,
 			ns      => $uri,
-			attr    => $attr,
-			content => $content,
+			attr    => {%$attr},
+			content => $self->render( $content ),
 			builder => $self,
 		);
-
 	} while @_;
 
 	return $self->fragment_class->new( builder => $self, content => \@out )
@@ -191,18 +226,18 @@ sub render {
 	my $self = shift;
 	my ( $r ) = @_;
 
-	my $t          = ref $r;
-	my $is_obj     = $t && Scalar::Util::blessed $r;
-	my $is_arefref = 'REF' eq $t && 'ARRAY' eq ref $$r;
+	my $t = ref $r;
 
-	if ( $is_obj and $r->isa( $self->fragment_class ) ) {
-		my ( $self_enc, $r_enc ) = map { lc $_->encoding } $self, $r->builder;
+	if ( $t && Scalar::Util::blessed $r ) {
+		return $r if not $r->isa( $self->fragment_class );
+
+		return $r if $self == $r->builder;
 
 		Carp::croak( 'Cannot merge XML::Builder fragments built with different namespace maps' )
-			if $self != $r->builder
-			and $r->depends_ns_scope;
+			if $r->depends_ns_scope;
 
-		return $r->as_string
+		my ( $self_enc, $r_enc ) = map { lc $_->encoding } $self, $r->builder;
+		return $r
 			if $self_enc eq $r_enc
 			# be more permissive: ASCII is one-way compatible with UTF-8 and Latin-1
 			or 'us-ascii' eq $r_enc and grep { $_ eq $self_enc } 'utf-8', 'iso-8859-1';
@@ -214,12 +249,11 @@ sub render {
 		);
 	}
 
-	return
-		  'ARRAY' eq $t   ? ( join '', map $self->render( $_ ), grep defined, @$r )
-		: $is_arefref     ? scalar $self->tag( @$$r )
-		: $t && ! $is_obj ? Carp::croak( 'Unknown type of reference ', $t )
-		: defined $r      ? $self->escape_text( $self->stringify( $r ) )
-		: ();
+	return $self->tag( @$r ) if 'ARRAY' eq $t;
+
+	Carp::croak( 'Unhandled type of reference ', $t ) if $t;
+
+	return $r;
 }
 
 {
@@ -243,6 +277,12 @@ sub render {
 			return Encode::encode $self->encoding, $str, Encode::HTMLCREF;
 		}';
 	}
+}
+
+sub encode {
+	my $self = shift;
+	my $str = $self->stringify( shift );
+	return Encode::encode $self->encoding, $str, Encode::HTMLCREF;
 }
 
 sub stringify {
@@ -303,7 +343,14 @@ sub depends_ns_scope { 0 }
 
 sub as_string {
 	my $self = shift;
-	return $self->builder->render( $self->content );
+	my $builder = $self->builder;
+	my $content = $self->content;
+
+	$content = [ $content ]
+		if 'ARRAY' ne ref $content
+		or Scalar::Util::blessed $content;
+
+	return join '', map { ref $_ ? $_->as_string : $builder->escape_text( $_ ) } @$content;
 }
 
 #######################################################################
@@ -320,7 +367,6 @@ package XML::Builder::Fragment::Tag;
 
 use parent -norequire => 'XML::Builder::Fragment';
 use Object::Tiny qw( name ns attr );
-use overload '""' => 'as_clarkname';
 
 sub depends_ns_scope { 1 }
 
@@ -335,9 +381,22 @@ sub as_string {
 		map { sprintf '%s="%s"', $builder->qname( $builder->parse_qname( $_ ), 1 ), $builder->escape_attr( $attr->{ $_ } ) }
 		sort keys %$attr;
 
-	return defined $self->content
-		? "<$tag>" . $self->SUPER::as_string . "</$qname>"
+	my $content = defined $self->content ? $self->SUPER::as_string : undef;
+	return defined $content
+		? "<$tag>$content</$qname>"
 		: "<$tag/>";
+}
+
+#######################################################################
+
+package XML::Builder::Fragment::TagLeaf;
+
+use parent -norequire => 'XML::Builder::Fragment::Tag';
+use overload '""' => 'as_clarkname';
+
+sub foreach {
+	my $self = shift;
+	return $self->builder->tag_foreach( [ $self->name, $self->ns ], @_ );
 }
 
 sub as_clarkname {

@@ -1,6 +1,6 @@
 use strict;
 use XML::Builder;
-use Test::More tests => 4;
+use Test::More tests => 6;
 
 isa_ok my $x = XML::Builder->new, 'XML::Builder';
 
@@ -15,3 +15,6 @@ is $x->escape_attr( qq(<\x{FF34}\x{FF25}\x{FF33}\x{FF34}\n"&'\rd\xE3t\xE3>) ),
 is $x->flatten_cdata( qq(Test <![CDATA[<CDATA>]]> sections) ),
 	                  qq(Test &lt;CDATA&gt; sections),
 	'CDATA sections are properly flattened';
+
+is $x->tag( 'p', 'AT&T >_<' )->as_string, '<p>AT&amp;T &gt;_&lt;</p>', 'automatic entity escaping';
+is $x->tag( 'p', $x->unsafe( 'AT&T >_<' ) )->as_string, '<p>AT&T >_<</p>', 'unsafe text';
