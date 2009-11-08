@@ -10,8 +10,9 @@ say $xb->root(
 	$h->html(
 		$h->head( $h->title( 'Sample page' ) ),
 		$h->body(
-			$h->h1( { class => 'main' }, 'Sample page' ),
-			$h->p->foreach( 'Hello, World', { class => 'detail' }, 'Second para', { class => undef }, '3rd > 2nd', "\x{20AC}" ),
+			"\n",
+			$h->h1( { class => 'main' }, 'Sample page' ) . "\n",
+			map "$_\n", $h->p->foreach( 'Hello, World', { class => 'detail' }, 'Second para', { class => undef }, '3rd > 2nd', "\x{20AC}" ),
 		),
 	),
 );

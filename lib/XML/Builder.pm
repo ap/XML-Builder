@@ -341,16 +341,29 @@ use Object::Tiny qw( builder content );
 
 sub depends_ns_scope { 0 }
 
+sub new {
+	my $class = shift;
+	my $self = bless { @_ }, $class;
+	my $content = \$self->{'content'};
+
+	$$content = [ defined $$content ? $$content : () ]
+		if 'ARRAY' ne ref $$content
+		or Scalar::Util::blessed $$content;
+
+	@$$content = map { ref $_ ? $_->flatten : $_ } @$$content;
+
+	return $self;
+}
+
 sub as_string {
 	my $self = shift;
 	my $builder = $self->builder;
-	my $content = $self->content;
+	return join '', map { ref $_ ? $_->as_string : $builder->escape_text( $_ ) } @{ $self->content };
+}
 
-	$content = [ $content ]
-		if 'ARRAY' ne ref $content
-		or Scalar::Util::blessed $content;
-
-	return join '', map { ref $_ ? $_->as_string : $builder->escape_text( $_ ) } @$content;
+sub flatten {
+	my $self = shift;
+	return @{ $self->content };
 }
 
 #######################################################################
@@ -359,7 +372,8 @@ package XML::Builder::Fragment::Unsafe;
 
 use parent -norequire => 'XML::Builder::Fragment';
 
-sub as_string { shift->content }
+sub as_string { map { defined $_ ? @$_ : undef } shift->content }
+sub flatten { shift }
 
 #######################################################################
 
@@ -381,11 +395,21 @@ sub as_string {
 		map { sprintf '%s="%s"', $builder->qname( $builder->parse_qname( $_ ), 1 ), $builder->escape_attr( $attr->{ $_ } ) }
 		sort keys %$attr;
 
-	my $content = defined $self->content ? $self->SUPER::as_string : undef;
+	my $content = @{ $self->content } ? $self->SUPER::as_string : undef;
 	return defined $content
 		? "<$tag>$content</$qname>"
 		: "<$tag/>";
 }
+
+sub append {
+	my $self = shift;
+	return $self->builder->fragment_class->new(
+		builder => $self->builder,
+		content => [ $self, $self->builder->render( @_ ) ],
+	);
+}
+
+sub flatten { shift }
 
 #######################################################################
 
