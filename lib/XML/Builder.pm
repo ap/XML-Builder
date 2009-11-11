@@ -14,6 +14,7 @@ sub fragment_class { 'XML::Builder::Fragment' }
 sub unsafe_class   { 'XML::Builder::Fragment::Unsafe' }
 sub tag_class      { 'XML::Builder::Fragment::Tag' }
 sub tagleaf_class  { 'XML::Builder::Fragment::TagLeaf' }
+sub root_class     { 'XML::Builder::Fragment::Root' }
 sub doc_class      { 'XML::Builder::Fragment::Document' }
 
 sub new {
@@ -206,14 +207,13 @@ sub tag_foreach {
 sub root {
 	my $self = shift;
 	my ( $tag ) = @_;
-	return $self->doc_class->adopt( $tag );
+	return $self->root_class->adopt( $tag );
 }
-
-sub preamble { qq(<?xml version="1.0" encoding="${\shift->encoding}"?>\n) }
 
 sub document {
 	my $self = shift;
-	return $self->preamble . $self->root( @_ );
+	my ( $tag ) = @_;
+	return $self->doc_class->adopt( $tag );
 }
 
 sub unsafe {
@@ -306,6 +306,8 @@ sub flatten_cdata {
 	Carp::croak( 'Incomplete CDATA section' ) if -1 < index $str, '<![CDATA[';
 	return $str;
 }
+
+sub preamble { qq(<?xml version="1.0" encoding="${\shift->encoding}"?>\n) }
 
 #######################################################################
 
@@ -433,7 +435,7 @@ sub as_clarkname {
 
 #######################################################################
 
-package XML::Builder::Fragment::Document;
+package XML::Builder::Fragment::Root;
 
 use parent -norequire => 'XML::Builder::Fragment::Tag';
 use overload '""' => 'as_string';
@@ -446,6 +448,17 @@ sub adopt {
 	$obj->{ 'attr' } ||= {};
 	$obj->builder->nsmap_to_attr( $obj->attr );
 	return bless $obj, $class;
+}
+
+#######################################################################
+
+package XML::Builder::Fragment::Document;
+
+use parent -norequire => 'XML::Builder::Fragment::Root';
+
+sub as_string {
+	my $self = shift;
+	return $self->builder->preamble . $self->SUPER::as_string( @_ );
 }
 
 #######################################################################
