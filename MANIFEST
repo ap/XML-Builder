@@ -3,12 +3,12 @@ Build.PL
 Changes
 lib/XML/Builder.pm
 MANIFEST			This list of files
-README
 t/00-load.t
 t/01-basic.t
-t/02-render.t
-t/03-stringify.t
-t/04-encoding.t
+t/02-distributivity.t
+t/03-encoding.t
+t/10-stringify.t
+t/11-render.t
 t/cpants.t
-eg/atom.pl
-eg/xhtml.pl
+t/eg-atom.t
+t/eg-xhtml.t
