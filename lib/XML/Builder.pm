@@ -1,20 +1,60 @@
-package XML::Builder;
-
 use strict;
-use Encode ();
+
+package XML::Builder::Util;
+
 use Scalar::Util ();
+use Encode ();
 use Carp ();
 
-use Object::Tiny qw( nsmap pfxmap default_ns encoding );
+sub is_raw_hash {
+	my ( $scalar ) = @_;
+	return
+		'HASH' eq ref $scalar
+		and not Scalar::Util::blessed $scalar;
+}
+
+sub is_raw_array {
+	my ( $scalar ) = @_;
+	return
+		'ARRAY' eq ref $scalar
+		and not Scalar::Util::blessed $scalar;
+}
+
+sub is_raw_scalar {
+	my ( $scalar ) = @_;
+	return
+		'SCALAR' eq ref $scalar
+		and not Scalar::Util::blessed $scalar;
+}
+
+sub merge_param_hash {
+	my ( $cur, $param ) = @_;
+
+	return if not ( @$param and is_raw_hash $param->[0] );
+
+	my $new = shift @$param;
+
+	@{ $cur }{ keys %$new } = values %$new;
+	while ( my ( $k, $v ) = each %$cur ) {
+		delete $cur->{ $k } if not defined $v;
+	}
+}
+
+#######################################################################
+
+package XML::Builder;
+
+use Object::Tiny qw( nsmap default_ns encoding );
 
 our $VERSION = '1.0001';
 $VERSION = eval $VERSION;
 
 # these aren't constants, they need to be overridable in subclasses
+sub ns_class       { 'XML::Builder::NS' }
 sub fragment_class { 'XML::Builder::Fragment' }
-sub unsafe_class   { 'XML::Builder::Fragment::Unsafe' }
+sub qname_class    { 'XML::Builder::Fragment::QName' }
 sub tag_class      { 'XML::Builder::Fragment::Tag' }
-sub tagleaf_class  { 'XML::Builder::Fragment::TagLeaf' }
+sub unsafe_class   { 'XML::Builder::Fragment::Unsafe' }
 sub root_class     { 'XML::Builder::Fragment::Root' }
 sub doc_class      { 'XML::Builder::Fragment::Document' }
 
@@ -22,8 +62,6 @@ sub new {
 	return bless {
 		encoding => 'us-ascii',
 		nsmap    => {},
-		counter  => 1,
-		pfxmap   => {},
 		@_
 	}, shift;
 }
@@ -37,72 +75,58 @@ sub register_ns {
 	$uri = $self->stringify( $uri );
 
 	if ( exists $nsmap->{ $uri } ) {
-		my $registered_pfx = $nsmap->{ $uri };
+		my $ns = $nsmap->{ $uri };
+		my $registered_pfx = $ns->prefix;
 
 		Carp::croak( "Namespace '$uri' being bound to '$pfx' is already bound to '$registered_pfx'" )
 			if defined $pfx and $pfx ne $registered_pfx;
 
-		return $self->pfxmap->{ $registered_pfx };
+		return $ns;
 	}
 
 	if ( not defined $pfx ) {
-		if ( $uri eq '' and not exists $self->pfxmap->{ '' } ) {
+		my %pfxmap = map {; $_->prefix => $_ } values %$nsmap;
+
+		if ( $uri eq '' and not exists $pfxmap{ '' } ) {
 			return $self->register_ns( '', '' );
 		}
 
+		my $counter;
 		my $letter = ( $uri =~ m!([[:alpha:]])[^/]*/?\z! ) ? lc $1 : 'ns';
-		do { $pfx = $letter . $self->{ 'counter' }++ } while exists $self->pfxmap->{ $pfx };
+		do { $pfx = $letter . ++$counter } while exists $pfxmap{ $pfx };
 	}
 
 	# FIXME needs proper validity check per XML TR
 	Carp::croak( "Invalid namespace prefix '$pfx'" )
 		if length $pfx and $pfx !~ /[\w-]/;
 
-	my $ns = XML::Builder::QName->new( $self, $uri );
+	my $ns = $self->ns_class->new(
+		builder => $self,
+		uri     => $uri,
+		prefix  => $pfx,
+	);
 
 	$self->{ 'default_ns' } = $uri if '' eq $pfx;
-	$nsmap->{ $uri } = $pfx;
-	$self->pfxmap->{ $pfx } = $ns;
-
-	return $ns;
+	return $nsmap->{ $uri } = $ns;
 }
 
-sub prefix_for_uri {
-	my $self = shift;
-	my ( $uri ) = @_;
-	$self->register_ns( $uri ) if not exists $self->nsmap->{ $uri };
-	return $self->nsmap->{ $uri };
-}
+sub ns { my $self = shift; $self->register_ns( @_ )->factory }
+sub null_ns { shift->ns( '', '' ) }
 
-sub null_ns { shift->register_ns( '', '' ) }
+sub qname {
+	my $self   = shift;
+	my $ns_uri = shift;
+	return $self->register_ns( $ns_uri )->qname( @_ );
+}
 
 sub parse_qname {
 	my $self = shift;
 	my ( $name ) = @_;
 
-	my $uri = '';
+	my $ns_uri = '';
+	$ns_uri = $1 if $name =~ s/\A\{([^}]+)\}//;
 
-	if ( 'ARRAY' eq ref $name ) {
-		( $name, $uri ) = @$name;
-		$uri = '' if not defined $uri;
-	}
-	elsif ( $name =~ s/\A\{([^}]+)\}// ) {
-		$uri = $1;
-	}
-
-	return ( $name, $uri );
-}
-
-sub qname {
-	my $self = shift;
-	my ( $name, $uri, $is_attr ) = @_;
-
-	# attributes without a prefix are in the null namespace,
-	# not in the default namespace, so never put a prefix on
-	# attributes in the null namespace
-	my $pfx = ( '' eq $uri and $is_attr ) ? '' : $self->prefix_for_uri( $uri );
-
-	return '' eq $pfx ? $name : "$pfx:$name";
+	return $self->qname( $ns_uri, $name );
 }
 
 sub nsmap_to_attr {
@@ -111,7 +135,8 @@ sub nsmap_to_attr {
 
 	$attr ||= {};
 
-	while ( my ( $uri, $pfx ) = each %{ $self->nsmap } ) {
+	while ( my ( $uri, $ns ) = each %{ $self->nsmap } ) {
+		my $pfx = $ns->prefix;
 		next if '' eq $pfx;
 		$attr->{ 'xmlns:' . $pfx } = $uri;
 	}
@@ -124,85 +149,6 @@ sub nsmap_to_attr {
 	$attr->{ xmlns } .= '';
 
 	return $attr;
-}
-
-my $is_raw_hash = sub {
-	my ( $scalar ) = @_;
-	return 'HASH' eq ref $scalar and not Scalar::Util::blessed $scalar;
-};
-
-my $merge_hash = sub {
-	my ( $cur, $new ) = @_;
-	@{ $cur }{ keys %$new } = values %$new;
-	while ( my ( $k, $v ) = each %$cur ) {
-		delete $cur->{ $k } if not defined $v;
-	}
-};
-
-sub tag {
-	my $self = shift;
-
-	if ( 'SCALAR' eq ref $_[0] and 'foreach' eq ${$_[0]} ) {
-		shift @_; # throw away
-		return $self->tag_foreach( @_ );
-	}
-
-	my $name = shift;
-	my ( $name, $uri ) = $self->parse_qname( $name );
-
-	if ( not @_ ) {
-		return $self->tagleaf_class->new(
-			name    => $name,
-			ns      => $uri,
-			builder => $self,
-		);
-	}
-
-	my $attr = {};
-	$merge_hash->( $attr, shift @_ ) if $is_raw_hash->( $_[0] );
-
-	return $self->tag_class->new(
-		name    => $name,
-		ns      => $uri,
-		attr    => $attr,
-		content => [ map $self->render( $_ ), @_ ],
-		builder => $self,
-	);
-}
-
-sub tag_foreach {
-	my $self = shift;
-	my $name = shift;
-
-	my ( $name, $uri ) = $self->parse_qname( $name );
-
-	if ( not @_ ) {
-		return $self->tagleaf_class->new(
-			name    => $name,
-			ns      => $uri,
-			builder => $self,
-		);
-	}
-
-	my $attr = {};
-	my @out  = ();
-
-	do {
-		$merge_hash->( $attr, shift @_ ) if $is_raw_hash->( $_[0] );
-		my $content = ( not $is_raw_hash->( $_[0] ) ) ? shift : undef;
-		push @out, $self->tag_class->new(
-			name    => $name,
-			ns      => $uri,
-			attr    => {%$attr},
-			content => $self->render( $content ),
-			builder => $self,
-		);
-	} while @_;
-
-	return $self->fragment_class->new( builder => $self, content => \@out )
-		if @out > 1 and not wantarray;
-
-	return @out[ 0 .. $#out ];
 }
 
 sub root {
@@ -225,36 +171,9 @@ sub unsafe {
 
 sub render {
 	my $self = shift;
-	my ( $r ) = @_;
-
-	my $t = ref $r;
-
-	if ( $t && Scalar::Util::blessed $r ) {
-		return $r if not $r->isa( $self->fragment_class );
-
-		return $r if $self == $r->builder;
-
-		Carp::croak( 'Cannot merge XML::Builder fragments built with different namespace maps' )
-			if $r->depends_ns_scope;
-
-		my ( $self_enc, $r_enc ) = map { lc $_->encoding } $self, $r->builder;
-		return $r
-			if $self_enc eq $r_enc
-			# be more permissive: ASCII is one-way compatible with UTF-8 and Latin-1
-			or 'us-ascii' eq $r_enc and grep { $_ eq $self_enc } 'utf-8', 'iso-8859-1';
-
-		Carp::croak(
-			'Cannot merge XML::Builder fragments'
-			. ' with incompatible encodings'
-			. " (have $self_enc, fragment has $r_enc)"
-		);
-	}
-
-	return $self->tag( @$r ) if 'ARRAY' eq $t;
-
-	Carp::croak( 'Unhandled type of reference ', $t ) if $t;
-
-	return $r;
+	return XML::Builder::Util::is_raw_scalar( $_[0] )
+		? $self->qname( ${$_[0]}, @_[ 1 .. $#_ ] )
+		: $self->fragment_class->new( builder => $self, content => [ @_ ] );
 }
 
 {
@@ -312,28 +231,120 @@ sub preamble { qq(<?xml version="1.0" encoding="${\shift->encoding}"?>\n) }
 
 #######################################################################
 
-package XML::Builder::QName;
+package XML::Builder::NS;
 
-use overload '""' => sub { $_[0]{'uri'} };
-
-sub AUTOLOAD {
-	our $AUTOLOAD =~ /.*::(.*)/;
-	splice @_, 1, 0, $1;
-	goto &_tag;
-}
+use Object::Tiny qw( builder uri prefix qname_for_localname );
+use overload '""' => 'uri';
 
 sub new {
 	my $class = shift;
-	my %self;
-	@self{ qw( builder uri ) } = @_;
-	return bless \%self, $class;
+	my $self = bless { qname_for_localname => {}, @_ }, $class;
+	Scalar::Util::weaken $self->{'builder'};
+	return $self;
 }
 
-sub _tag {
+sub qname {
 	my $self = shift;
 	my $name = shift;
-	my ( $builder, $uri ) = @{$self}{ qw( builder uri ) };
-	return $builder->tag( [ $name, $uri ], @_ );
+
+	my $builder = $self->builder
+		|| Carp::croak( 'XML::Builder for this NS object has gone out of scope' );
+
+	my $qname = $self->qname_for_localname->{ $name } ||= $builder->qname_class->new(
+		name    => $name,
+		ns      => $self,
+		builder => $builder,
+	);
+
+	return @_ ? $qname->tag( @_ ) : $qname;
+}
+
+sub factory { bless \shift, 'XML::Builder::NS::QNameFactory' }
+
+#######################################################################
+
+package XML::Builder::NS::QNameFactory;
+
+sub AUTOLOAD { my $self = shift; $$self->qname( ( our $AUTOLOAD =~ /.*::(.*)/ ), @_ ) }
+sub _qname   { my $self = shift; $$self->qname(                                  @_ ) }
+
+#######################################################################
+
+package XML::Builder::Fragment::QName;
+
+use Object::Tiny qw( builder ns name as_qname as_attr_qname as_clarkname as_string );
+
+use parent -norequire => 'XML::Builder::Fragment';
+use overload '""' => 'as_clarkname';
+
+sub new {
+	my $class = shift;
+	my $self = bless { @_ }, $class;
+
+	my $uri = $self->ns->uri;
+	my $pfx = $self->ns->prefix;
+	Scalar::Util::weaken $self->{'ns'}; # really don't even need this any more
+	Scalar::Util::weaken $self->{'builder'};
+
+	# NB.: attributes without a prefix not in a namespace rather than in the
+	# default namespace, so attributes without a namespace never need a prefix
+
+	my $name = $self->name;
+	$self->{'as_qname'}      = ( '' eq $pfx               ) ? $name : "$pfx:$name";
+	$self->{'as_attr_qname'} = ( '' eq $pfx or '' eq $uri ) ? $name : "$pfx:$name";
+	$self->{'as_clarkname'}  = (               '' eq $uri ) ? $name : "{$uri}$name";
+	$self->{'as_string'}     = '<' . $self->as_qname . '/>';
+
+	return $self;
+}
+
+sub tag {
+	my $self = shift;
+
+	if ( 'SCALAR' eq ref $_[0] and 'foreach' eq ${$_[0]} ) {
+		shift @_; # throw away
+		return $self->foreach( @_ );
+	}
+
+	# has to be written this way so it'll drop undef attributes
+	my $attr = {};
+	XML::Builder::Util::merge_param_hash( $attr, \@_ );
+
+	my $builder = $self->builder
+		|| Carp::croak( 'XML::Builder for this QName object has gone out of scope' );
+
+	return $builder->tag_class->new(
+		qname   => $self,
+		attr    => $attr,
+		content => [ map $builder->render( $_ ), @_ ],
+		builder => $builder,
+	);
+}
+
+sub foreach {
+	my $self = shift;
+
+	my $attr = {};
+	my @out  = ();
+
+	my $builder = $self->builder
+		|| Carp::croak( 'XML::Builder for this QName object has gone out of scope' );
+
+	do {
+		XML::Builder::Util::merge_param_hash( $attr, \@_ );
+		my $content = XML::Builder::Util::is_raw_hash( $_[0] ) ? undef : shift;
+		push @out, $builder->tag_class->new(
+			qname   => $self,
+			attr    => {%$attr},
+			content => $builder->render( $content ),
+			builder => $builder,
+		);
+	} while @_;
+
+	return $builder->fragment_class->new( builder => $builder, content => \@out )
+		if @out > 1 and not wantarray;
+
+	return @out[ 0 .. $#out ];
 }
 
 #######################################################################
@@ -347,13 +358,47 @@ sub depends_ns_scope { 0 }
 sub new {
 	my $class = shift;
 	my $self = bless { @_ }, $class;
-	my $content = \$self->{'content'};
+	my $builder = $self->builder;
+	my $content = $self->content;
 
-	$$content = [ defined $$content ? $$content : () ]
-		if 'ARRAY' ne ref $$content
-		or Scalar::Util::blessed $$content;
+	my ( @gather, @take );
 
-	@$$content = map { ref $_ ? $_->flatten : $_ } @$$content;
+	for my $r ( XML::Builder::Util::is_raw_array( $content ) ? @$content : $content ) {
+		@take = $r;
+
+		if ( not Scalar::Util::blessed $r ) {
+			@take = $builder->render( @_ ) if XML::Builder::Util::is_raw_array $r;
+			next;
+		}
+
+		if ( not $r->isa( $builder->fragment_class ) ) {
+			@take = $builder->stringify( $r );
+			next;
+		}
+
+		next if $builder == $r->builder;
+
+		Carp::croak( 'Cannot merge XML::Builder fragments built with different namespace maps' )
+			if $r->depends_ns_scope;
+
+		@take = $r->flatten;
+
+		my ( $self_enc, $r_enc ) = map { lc $_->encoding } $builder, $r->builder;
+		next
+			if $self_enc eq $r_enc
+			# be more permissive: ASCII is one-way compatible with UTF-8 and Latin-1
+			or 'us-ascii' eq $r_enc and grep { $_ eq $self_enc } 'utf-8', 'iso-8859-1';
+
+		Carp::croak(
+			'Cannot merge XML::Builder fragments with incompatible encodings'
+			. " (have $self_enc, fragment has $r_enc)"
+		);
+	}
+	continue {
+		push @gather, @take;
+	}
+
+	$self->{'content'} = \@gather;
 
 	return $self;
 }
@@ -383,7 +428,7 @@ sub flatten { shift }
 package XML::Builder::Fragment::Tag;
 
 use parent -norequire => 'XML::Builder::Fragment';
-use Object::Tiny qw( name ns attr );
+use Object::Tiny qw( qname attr );
 
 sub depends_ns_scope { 1 }
 
@@ -391,11 +436,11 @@ sub as_string {
 	my $self = shift;
 
 	my $builder = $self->builder;
-	my $qname   = $builder->qname( $self->name, $self->ns );
+	my $qname   = $self->qname->as_qname;
 	my $attr    = $self->attr || {};
 
 	my $tag = join ' ', $qname,
-		map { sprintf '%s="%s"', $builder->qname( $builder->parse_qname( $_ ), 1 ), $builder->escape_attr( $attr->{ $_ } ) }
+		map { sprintf '%s="%s"', $builder->parse_qname( $_ )->as_attr_qname, $builder->escape_attr( $attr->{ $_ } ) }
 		sort keys %$attr;
 
 	my $content = @{ $self->content } ? $self->SUPER::as_string : undef;
@@ -413,26 +458,6 @@ sub append {
 }
 
 sub flatten { shift }
-
-#######################################################################
-
-package XML::Builder::Fragment::TagLeaf;
-
-use parent -norequire => 'XML::Builder::Fragment::Tag';
-use overload '""' => 'as_clarkname';
-
-sub foreach {
-	my $self = shift;
-	return $self->builder->tag_foreach( [ $self->name, $self->ns ], @_ );
-}
-
-sub as_clarkname {
-	my $self = shift;
-	my $name = $self->name;
-	my $ns = $self->ns;
-	return $name if not defined $ns;
-	return "{$ns}$name";
-}
 
 #######################################################################
 

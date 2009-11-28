@@ -3,10 +3,10 @@ use XML::Builder;
 use Test::More tests => 5;
 
 isa_ok my $xb = XML::Builder->new, 'XML::Builder';;
-isa_ok my $a = $xb->register_ns( 'http://www.w3.org/2005/Atom' => '' ), 'XML::Builder::QName';
+isa_ok my $a = $xb->ns( 'http://www.w3.org/2005/Atom' => '' ), 'XML::Builder::NS::QNameFactory';
 
 isa_ok my $hb = XML::Builder->new, 'XML::Builder';;
-isa_ok my $h = $hb->register_ns( 'http://www.w3.org/1999/xhtml' => '' ), 'XML::Builder::QName';
+isa_ok my $h = $hb->ns( 'http://www.w3.org/1999/xhtml' => '' ), 'XML::Builder::NS::QNameFactory';
 
 chomp( my $expected = << '' );
 <?xml version="1.0" encoding="us-ascii"?>

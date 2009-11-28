@@ -3,7 +3,7 @@ use XML::Builder;
 use Test::More tests => 3;
 
 isa_ok my $xb = XML::Builder->new, 'XML::Builder';;
-isa_ok my $h = $xb->register_ns( 'http://www.w3.org/1999/xhtml' => '' ), 'XML::Builder::QName';
+isa_ok my $h = $xb->ns( 'http://www.w3.org/1999/xhtml' => '' ), 'XML::Builder::NS::QNameFactory';
 
 chomp( my $expected = <<'' );
 <html xmlns="http://www.w3.org/1999/xhtml"><head><title>Sample page</title></head><body>
