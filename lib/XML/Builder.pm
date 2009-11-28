@@ -10,6 +10,7 @@ use Object::Tiny qw( nsmap pfxmap default_ns encoding );
 our $VERSION = '1.0001';
 $VERSION = eval $VERSION;
 
+# these aren't constants, they need to be overridable in subclasses
 sub fragment_class { 'XML::Builder::Fragment' }
 sub unsafe_class   { 'XML::Builder::Fragment::Unsafe' }
 sub tag_class      { 'XML::Builder::Fragment::Tag' }
