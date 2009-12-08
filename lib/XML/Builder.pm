@@ -59,11 +59,11 @@ sub root_class     { 'XML::Builder::Fragment::Root' }
 sub doc_class      { 'XML::Builder::Fragment::Document' }
 
 sub new {
-	return bless {
-		encoding => 'us-ascii',
-		nsmap    => {},
-		@_
-	}, shift;
+	my $class = shift;
+	my $self = bless { @_ }, $class;
+	$self->encoding ||= 'us-ascii';
+	$self->nsmap ||= {};
+	return $self;
 }
 
 sub register_ns {
@@ -230,7 +230,8 @@ use overload '""' => 'uri';
 
 sub new {
 	my $class = shift;
-	my $self = bless { qname_for_localname => {}, @_ }, $class;
+	my $self = bless { @_ }, $class;
+	$self->qname_for_localname ||= {};
 	Scalar::Util::weaken $self->builder;
 	return $self;
 }
