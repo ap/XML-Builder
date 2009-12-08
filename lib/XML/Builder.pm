@@ -184,25 +184,25 @@ sub render {
 	);
 
 	my %type = (
+		encode      => undef,
 		escape_text => qr/([<>&'"])/,
 		escape_attr => qr/([<>&'"\xA\xD])/,
 	);
 
+	# using eval instead of closures to avoid __ANON__
 	while ( my ( $subname, $specials_rx ) = each %type ) {
-		# using eval instead of closures to avoid __ANON__
-		eval 'sub '.$subname.' {
+		my $esc = '';
+
+		$esc = sprintf '$str =~ s{ %s }{ $XML_NCR{$1} }gex', $specials_rx
+			if defined $specials_rx;
+
+		eval sprintf 'sub %s {
 			my $self = shift;
 			my $str = $self->stringify( shift );
-			$str =~ s{ '.$specials_rx.' }{ $XML_NCR{$1} }gex;
+			%s;
 			return Encode::encode $self->encoding, $str, Encode::HTMLCREF;
-		}';
+		}', $subname, $esc;
 	}
-}
-
-sub encode {
-	my $self = shift;
-	my $str = $self->stringify( shift );
-	return Encode::encode $self->encoding, $str, Encode::HTMLCREF;
 }
 
 sub stringify {
