@@ -44,7 +44,7 @@ sub merge_param_hash {
 
 package XML::Builder;
 
-use Object::Tiny qw( nsmap default_ns encoding );
+use Object::Tiny::Lvalue qw( nsmap default_ns encoding );
 
 our $VERSION = '1.0001';
 $VERSION = eval $VERSION;
@@ -106,7 +106,7 @@ sub register_ns {
 		prefix  => $pfx,
 	);
 
-	$self->{ 'default_ns' } = $uri if '' eq $pfx;
+	$self->default_ns = $uri if '' eq $pfx;
 	return $nsmap->{ $uri } = $ns;
 }
 
@@ -233,13 +233,13 @@ sub preamble { qq(<?xml version="1.0" encoding="${\shift->encoding}"?>\n) }
 
 package XML::Builder::NS;
 
-use Object::Tiny qw( builder uri prefix qname_for_localname );
+use Object::Tiny::Lvalue qw( builder uri prefix qname_for_localname );
 use overload '""' => 'uri';
 
 sub new {
 	my $class = shift;
 	my $self = bless { qname_for_localname => {}, @_ }, $class;
-	Scalar::Util::weaken $self->{'builder'};
+	Scalar::Util::weaken $self->builder;
 	return $self;
 }
 
@@ -272,7 +272,7 @@ sub _qname   { my $self = shift; $$self->qname(                                 
 
 package XML::Builder::Fragment::QName;
 
-use Object::Tiny qw( builder ns name as_qname as_attr_qname as_clarkname as_string );
+use Object::Tiny::Lvalue qw( builder ns name as_qname as_attr_qname as_clarkname as_string );
 
 use parent -norequire => 'XML::Builder::Fragment';
 use overload '""' => 'as_clarkname';
@@ -283,17 +283,17 @@ sub new {
 
 	my $uri = $self->ns->uri;
 	my $pfx = $self->ns->prefix;
-	Scalar::Util::weaken $self->{'ns'}; # really don't even need this any more
-	Scalar::Util::weaken $self->{'builder'};
+	Scalar::Util::weaken $self->ns; # really don't even need this any more
+	Scalar::Util::weaken $self->builder;
 
 	# NB.: attributes without a prefix not in a namespace rather than in the
 	# default namespace, so attributes without a namespace never need a prefix
 
 	my $name = $self->name;
-	$self->{'as_qname'}      = ( '' eq $pfx               ) ? $name : "$pfx:$name";
-	$self->{'as_attr_qname'} = ( '' eq $pfx or '' eq $uri ) ? $name : "$pfx:$name";
-	$self->{'as_clarkname'}  = (               '' eq $uri ) ? $name : "{$uri}$name";
-	$self->{'as_string'}     = '<' . $self->as_qname . '/>';
+	$self->as_qname      = ( '' eq $pfx               ) ? $name : "$pfx:$name";
+	$self->as_attr_qname = ( '' eq $pfx or '' eq $uri ) ? $name : "$pfx:$name";
+	$self->as_clarkname  = (               '' eq $uri ) ? $name : "{$uri}$name";
+	$self->as_string     = '<' . $self->as_qname . '/>';
 
 	return $self;
 }
@@ -351,7 +351,7 @@ sub foreach {
 
 package XML::Builder::Fragment;
 
-use Object::Tiny qw( builder content );
+use Object::Tiny::Lvalue qw( builder content );
 
 sub depends_ns_scope { 0 }
 
@@ -398,7 +398,7 @@ sub new {
 		push @gather, @take;
 	}
 
-	$self->{'content'} = \@gather;
+	$self->content = \@gather;
 
 	return $self;
 }
@@ -428,7 +428,7 @@ sub flatten { shift }
 package XML::Builder::Fragment::Tag;
 
 use parent -norequire => 'XML::Builder::Fragment';
-use Object::Tiny qw( qname attr );
+use Object::Tiny::Lvalue qw( qname attr );
 
 sub depends_ns_scope { 1 }
 
@@ -471,8 +471,7 @@ sub depends_ns_scope { 0 }
 sub adopt {
 	my $class = shift;
 	my ( $obj ) = @_;
-	$obj->{ 'attr' } ||= {};
-	$obj->builder->nsmap_to_attr( $obj->attr );
+	$obj->builder->nsmap_to_attr( $obj->attr ||= {} );
 	return bless $obj, $class;
 }
 
