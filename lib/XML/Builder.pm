@@ -420,7 +420,18 @@ package XML::Builder::Fragment::Unsafe;
 
 use parent -norequire => 'XML::Builder::Fragment';
 
-sub as_string { map { defined $_ ? @$_ : undef } shift->content }
+sub new {
+	my $class = shift;
+	my $self = bless { @_ }, $class;
+	$self->content = $self->builder->stringify( $self->content );
+	return $self;
+}
+
+sub as_string {
+	my $self = shift;
+	return $self->builder->encode( $self->content );
+}
+
 sub flatten { shift }
 
 #######################################################################
