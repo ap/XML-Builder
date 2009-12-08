@@ -219,14 +219,6 @@ sub stringify {
 	XML::Builder::Util::croak( 'Unstringifiable object ', $thing );
 }
 
-sub flatten_cdata {
-	my $self = shift;
-	my ( $str ) = @_;
-	$str =~ s{<!\[CDATA\[(.*?)]]>}{ $self->escape_text( $1 ) }gse;
-	XML::Builder::Util::croak( 'Incomplete CDATA section' ) if -1 < index $str, '<![CDATA[';
-	return $str;
-}
-
 sub preamble { qq(<?xml version="1.0" encoding="${\shift->encoding}"?>\n) }
 
 #######################################################################
