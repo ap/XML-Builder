@@ -11,6 +11,7 @@ my $builder = Module::Build->new(
 		Encode                 => 0,
 		parent                 => 0,
 		'Object::Tiny::Lvalue' => 0,
+		'Carp::Clan'           => 0,
 	},
 	build_requires     => { 'Test::More' => 0 },
 	add_to_cleanup     => [ 'XML-Builder-*' ],

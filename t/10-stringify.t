@@ -23,7 +23,7 @@ use overload '""' => sub { 'ignore me' };
 
 my $obj1 = SomeClass->new;
 eval { $x->stringify( $obj1 ) };
-like $@, qr/^Unstringifiable object SomeClass=/, 'reject random objects';
+like $@, qr/Unstringifiable object SomeClass=/, 'reject random objects';
 
 my $obj2 = SomeClass::AsStr->new;
 is $x->stringify( $obj2 ), 'an object', 'explicit object stringification';

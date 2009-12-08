@@ -4,7 +4,7 @@ package XML::Builder::Util;
 
 use Scalar::Util ();
 use Encode ();
-use Carp ();
+use Carp::Clan '^XML::Builder(?:\z|::)';
 
 sub is_raw_hash {
 	my ( $scalar ) = @_;
@@ -78,7 +78,7 @@ sub register_ns {
 		my $ns = $nsmap->{ $uri };
 		my $registered_pfx = $ns->prefix;
 
-		Carp::croak( "Namespace '$uri' being bound to '$pfx' is already bound to '$registered_pfx'" )
+		XML::Builder::Util::croak( "Namespace '$uri' being bound to '$pfx' is already bound to '$registered_pfx'" )
 			if defined $pfx and $pfx ne $registered_pfx;
 
 		return $ns;
@@ -97,7 +97,7 @@ sub register_ns {
 	}
 
 	# FIXME needs proper validity check per XML TR
-	Carp::croak( "Invalid namespace prefix '$pfx'" )
+	XML::Builder::Util::croak( "Invalid namespace prefix '$pfx'" )
 		if length $pfx and $pfx !~ /[\w-]/;
 
 	my $ns = $self->ns_class->new(
@@ -216,14 +216,14 @@ sub stringify {
 	my $conv = $thing->can( 'as_string' ) || overload::Method( $thing, '""' );
 	return $conv->( $thing ) if $conv;
 
-	Carp::croak( 'Unstringifiable object ', $thing );
+	XML::Builder::Util::croak( 'Unstringifiable object ', $thing );
 }
 
 sub flatten_cdata {
 	my $self = shift;
 	my ( $str ) = @_;
 	$str =~ s{<!\[CDATA\[(.*?)]]>}{ $self->escape_text( $1 ) }gse;
-	Carp::croak( 'Incomplete CDATA section' ) if -1 < index $str, '<![CDATA[';
+	XML::Builder::Util::croak( 'Incomplete CDATA section' ) if -1 < index $str, '<![CDATA[';
 	return $str;
 }
 
@@ -248,7 +248,7 @@ sub qname {
 	my $name = shift;
 
 	my $builder = $self->builder
-		|| Carp::croak( 'XML::Builder for this NS object has gone out of scope' );
+		|| XML::Builder::Util::croak( 'XML::Builder for this NS object has gone out of scope' );
 
 	my $qname = $self->qname_for_localname->{ $name } ||= $builder->qname_class->new(
 		name    => $name,
@@ -311,7 +311,7 @@ sub tag {
 	XML::Builder::Util::merge_param_hash( $attr, \@_ );
 
 	my $builder = $self->builder
-		|| Carp::croak( 'XML::Builder for this QName object has gone out of scope' );
+		|| XML::Builder::Util::croak( 'XML::Builder for this QName object has gone out of scope' );
 
 	return $builder->tag_class->new(
 		qname   => $self,
@@ -328,7 +328,7 @@ sub foreach {
 	my @out  = ();
 
 	my $builder = $self->builder
-		|| Carp::croak( 'XML::Builder for this QName object has gone out of scope' );
+		|| XML::Builder::Util::croak( 'XML::Builder for this QName object has gone out of scope' );
 
 	do {
 		XML::Builder::Util::merge_param_hash( $attr, \@_ );
@@ -378,7 +378,7 @@ sub new {
 
 		next if $builder == $r->builder;
 
-		Carp::croak( 'Cannot merge XML::Builder fragments built with different namespace maps' )
+		XML::Builder::Util::croak( 'Cannot merge XML::Builder fragments built with different namespace maps' )
 			if $r->depends_ns_scope;
 
 		@take = $r->flatten;
@@ -389,7 +389,7 @@ sub new {
 			# be more permissive: ASCII is one-way compatible with UTF-8 and Latin-1
 			or 'us-ascii' eq $r_enc and grep { $_ eq $self_enc } 'utf-8', 'iso-8859-1';
 
-		Carp::croak(
+		XML::Builder::Util::croak(
 			'Cannot merge XML::Builder fragments with incompatible encodings'
 			. " (have $self_enc, fragment has $r_enc)"
 		);
