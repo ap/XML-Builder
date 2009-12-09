@@ -260,6 +260,7 @@ package XML::Builder::NS::QNameFactory;
 
 sub AUTOLOAD { my $self = shift; $$self->qname( ( our $AUTOLOAD =~ /.*::(.*)/ ), @_ ) }
 sub _qname   { my $self = shift; $$self->qname(                                  @_ ) }
+sub DESTROY  {}
 
 #######################################################################
 
