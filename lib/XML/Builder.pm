@@ -263,85 +263,6 @@ sub _qname   { my $self = shift; $$self->qname(                                 
 
 #######################################################################
 
-package XML::Builder::Fragment::QName;
-
-use Object::Tiny::Lvalue qw( builder ns name as_qname as_attr_qname as_clarkname as_string );
-
-use parent -norequire => 'XML::Builder::Fragment';
-use overload '""' => 'as_clarkname';
-
-sub new {
-	my $class = shift;
-	my $self = bless { @_ }, $class;
-
-	my $uri = $self->ns->uri;
-	my $pfx = $self->ns->prefix;
-	Scalar::Util::weaken $self->ns; # really don't even need this any more
-	Scalar::Util::weaken $self->builder;
-
-	# NB.: attributes without a prefix not in a namespace rather than in the
-	# default namespace, so attributes without a namespace never need a prefix
-
-	my $name = $self->name;
-	$self->as_qname      = ( '' eq $pfx               ) ? $name : "$pfx:$name";
-	$self->as_attr_qname = ( '' eq $pfx or '' eq $uri ) ? $name : "$pfx:$name";
-	$self->as_clarkname  = (               '' eq $uri ) ? $name : "{$uri}$name";
-	$self->as_string     = '<' . $self->as_qname . '/>';
-
-	return $self;
-}
-
-sub tag {
-	my $self = shift;
-
-	if ( 'SCALAR' eq ref $_[0] and 'foreach' eq ${$_[0]} ) {
-		shift @_; # throw away
-		return $self->foreach( @_ );
-	}
-
-	# has to be written this way so it'll drop undef attributes
-	my $attr = {};
-	XML::Builder::Util::merge_param_hash( $attr, \@_ );
-
-	my $builder = $self->builder
-		|| XML::Builder::Util::croak( 'XML::Builder for this QName object has gone out of scope' );
-
-	return $builder->tag_class->new(
-		qname   => $self,
-		attr    => $attr,
-		content => [ map $builder->render( $_ ), @_ ],
-		builder => $builder,
-	);
-}
-
-sub foreach {
-	my $self = shift;
-
-	my $attr = {};
-	my @out  = ();
-
-	my $builder = $self->builder
-		|| XML::Builder::Util::croak( 'XML::Builder for this QName object has gone out of scope' );
-
-	do {
-		XML::Builder::Util::merge_param_hash( $attr, \@_ );
-		my $content = XML::Builder::Util::is_raw_hash( $_[0] ) ? undef : shift;
-		push @out, $builder->tag_class->new(
-			qname   => $self,
-			attr    => {%$attr},
-			content => $builder->render( $content ),
-			builder => $builder,
-		);
-	} while @_;
-
-	return $builder->fragment_class->new( builder => $builder, content => \@out )
-		if @out > 1 and not wantarray;
-
-	return @out[ 0 .. $#out ];
-}
-
-#######################################################################
-
 package XML::Builder::Fragment;
 
 use Object::Tiny::Lvalue qw( builder content );
@@ -426,6 +347,85 @@ sub as_string {
 }
 
 sub flatten { shift }
+
+#######################################################################
+
+package XML::Builder::Fragment::QName;
+
+use Object::Tiny::Lvalue qw( builder ns name as_qname as_attr_qname as_clarkname as_string );
+
+use parent -norequire => 'XML::Builder::Fragment';
+use overload '""' => 'as_clarkname';
+
+sub new {
+	my $class = shift;
+	my $self = bless { @_ }, $class;
+
+	my $uri = $self->ns->uri;
+	my $pfx = $self->ns->prefix;
+	Scalar::Util::weaken $self->ns; # really don't even need this any more
+	Scalar::Util::weaken $self->builder;
+
+	# NB.: attributes without a prefix not in a namespace rather than in the
+	# default namespace, so attributes without a namespace never need a prefix
+
+	my $name = $self->name;
+	$self->as_qname      = ( '' eq $pfx               ) ? $name : "$pfx:$name";
+	$self->as_attr_qname = ( '' eq $pfx or '' eq $uri ) ? $name : "$pfx:$name";
+	$self->as_clarkname  = (               '' eq $uri ) ? $name : "{$uri}$name";
+	$self->as_string     = '<' . $self->as_qname . '/>';
+
+	return $self;
+}
+
+sub tag {
+	my $self = shift;
+
+	if ( 'SCALAR' eq ref $_[0] and 'foreach' eq ${$_[0]} ) {
+		shift @_; # throw away
+		return $self->foreach( @_ );
+	}
+
+	# has to be written this way so it'll drop undef attributes
+	my $attr = {};
+	XML::Builder::Util::merge_param_hash( $attr, \@_ );
+
+	my $builder = $self->builder
+		|| XML::Builder::Util::croak( 'XML::Builder for this QName object has gone out of scope' );
+
+	return $builder->tag_class->new(
+		qname   => $self,
+		attr    => $attr,
+		content => [ map $builder->render( $_ ), @_ ],
+		builder => $builder,
+	);
+}
+
+sub foreach {
+	my $self = shift;
+
+	my $attr = {};
+	my @out  = ();
+
+	my $builder = $self->builder
+		|| XML::Builder::Util::croak( 'XML::Builder for this QName object has gone out of scope' );
+
+	do {
+		XML::Builder::Util::merge_param_hash( $attr, \@_ );
+		my $content = XML::Builder::Util::is_raw_hash( $_[0] ) ? undef : shift;
+		push @out, $builder->tag_class->new(
+			qname   => $self,
+			attr    => {%$attr},
+			content => $builder->render( $content ),
+			builder => $builder,
+		);
+	} while @_;
+
+	return $builder->fragment_class->new( builder => $builder, content => \@out )
+		if @out > 1 and not wantarray;
+
+	return @out[ 0 .. $#out ];
+}
 
 #######################################################################
 
