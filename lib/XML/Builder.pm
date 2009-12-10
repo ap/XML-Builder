@@ -40,6 +40,15 @@ sub merge_param_hash {
 	}
 }
 
+sub factory_method {
+	my ( $name, $class ) = @_;
+	my ( $class_method, $new_method ) = ( "$name\_class", "new_$name" );
+	return <<";";
+sub $class_method { "\Q$class\E" }
+sub $new_method { \$_[0]->$class_method->new( builder => \@_ ) }
+;
+}
+
 #######################################################################
 
 package XML::Builder;
@@ -49,14 +58,22 @@ use Object::Tiny::Lvalue qw( nsmap default_ns encoding );
 our $VERSION = '1.0001';
 $VERSION = eval $VERSION;
 
-# these aren't constants, they need to be overridable in subclasses
-sub ns_class       { 'XML::Builder::NS' }
-sub fragment_class { 'XML::Builder::Fragment' }
-sub qname_class    { 'XML::Builder::Fragment::QName' }
-sub tag_class      { 'XML::Builder::Fragment::Tag' }
-sub unsafe_class   { 'XML::Builder::Fragment::Unsafe' }
-sub root_class     { 'XML::Builder::Fragment::Root' }
-sub doc_class      { 'XML::Builder::Fragment::Document' }
+BEGIN {
+	# these aren't constants, they need to be overridable in subclasses
+	my %class = (
+		ns       => 'XML::Builder::NS',
+		fragment => 'XML::Builder::Fragment',
+		qname    => 'XML::Builder::Fragment::QName',
+		tag      => 'XML::Builder::Fragment::Tag',
+		unsafe   => 'XML::Builder::Fragment::Unsafe',
+		root     => 'XML::Builder::Fragment::Root',
+		document => 'XML::Builder::Fragment::Document',
+	);
+
+	my ( $name, $class );
+	eval XML::Builder::Util::factory_method( $name, $class )
+		while ( $name, $class ) = each %class;
+}
 
 sub new {
 	my $class = shift;
@@ -100,8 +117,7 @@ sub register_ns {
 	XML::Builder::Util::croak( "Invalid namespace prefix '$pfx'" )
 		if length $pfx and $pfx !~ /[\w-]/;
 
-	my $ns = $self->ns_class->new(
-		builder => $self,
+	my $ns = $self->new_ns(
 		uri     => $uri,
 		prefix  => $pfx,
 	);
@@ -110,7 +126,12 @@ sub register_ns {
 	return $nsmap->{ $uri } = $ns;
 }
 
-sub ns { my $self = shift; $self->register_ns( @_ )->factory }
+sub get_namespaces {
+	my $self = shift;
+	return values %{ $self->nsmap };
+}
+
+sub ns { shift->register_ns( @_ )->factory }
 sub null_ns { shift->ns( '', '' ) }
 
 sub qname {
@@ -129,51 +150,35 @@ sub parse_qname {
 	return $self->qname( $ns_uri, $name );
 }
 
-sub nsmap_to_attr {
-	my $self = shift;
-	my ( $attr ) = @_;
-
-	$attr ||= {};
-
-	while ( my ( $uri, $ns ) = each %{ $self->nsmap } ) {
-		my $pfx = $ns->prefix;
-		next if '' eq $pfx;
-		$attr->{ 'xmlns:' . $pfx } = $uri;
-	}
-
-	# make sure to always declare the default NS (if not bound to a URI, by
-	# explicitly undefining it) to allow embedding the XML easily without
-	# having to parse the fragment
-	# [in 5.10: $attr->{ xmlns } = $map->default_ns // '';]
-	$attr->{ xmlns } = $self->default_ns;
-	$attr->{ xmlns } .= '';
-
-	return $attr;
-}
-
 sub root {
 	my $self = shift;
 	my ( $tag ) = @_;
-	return $self->root_class->adopt( $tag );
+	return $tag->root;
 }
 
 sub document {
 	my $self = shift;
 	my ( $tag ) = @_;
-	return $self->doc_class->adopt( $tag );
+	return $tag->document;
 }
 
 sub unsafe {
 	my $self = shift;
 	my ( $string ) = @_;
-	return $self->unsafe_class->new( builder => $self, content => $string );
+	return $self->new_unsafe( content => $string );
 }
 
 sub render {
 	my $self = shift;
 	return XML::Builder::Util::is_raw_scalar( $_[0] )
 		? $self->qname( ${$_[0]}, @_[ 1 .. $#_ ] )
-		: $self->fragment_class->new( builder => $self, content => [ @_ ] );
+		: $self->new_fragment( content => [ @_ ] );
+}
+
+sub test_fragment {
+	my $self = shift;
+	my ( $obj ) = @_;
+	return $obj->isa( 'XML::Builder::Fragment::Role' );
 }
 
 {
@@ -243,13 +248,17 @@ sub qname {
 	my $builder = $self->builder
 		|| XML::Builder::Util::croak( 'XML::Builder for this NS object has gone out of scope' );
 
-	my $qname = $self->qname_for_localname->{ $name } ||= $builder->qname_class->new(
-		name    => $name,
-		ns      => $self,
-		builder => $builder,
-	);
+	my $qname
+		= $self->qname_for_localname->{ $name }
+		||= $builder->new_qname( name => $name, ns => $self );
 
 	return @_ ? $qname->tag( @_ ) : $qname;
+}
+
+sub xmlns {
+	my $self = shift;
+	my $pfx = $self->prefix;
+	return ( ( '' ne $pfx ? "xmlns:$pfx" : 'xmlns' ), $self->uri );
 }
 
 sub factory { bless \shift, 'XML::Builder::NS::QNameFactory' }
@@ -264,7 +273,15 @@ sub DESTROY  {}
 
 #######################################################################
 
+package XML::Builder::Fragment::Role;
+
+sub depends_ns_scope { 1 }
+
+#######################################################################
+
 package XML::Builder::Fragment;
+
+use parent -norequire => 'XML::Builder::Fragment::Role';
 
 use Object::Tiny::Lvalue qw( builder content );
 
@@ -286,7 +303,7 @@ sub new {
 			next;
 		}
 
-		if ( not $r->isa( $builder->fragment_class ) ) {
+		if ( not $builder->test_fragment( $r ) ) {
 			@take = $builder->stringify( $r );
 			next;
 		}
@@ -394,11 +411,10 @@ sub tag {
 	my $builder = $self->builder
 		|| XML::Builder::Util::croak( 'XML::Builder for this QName object has gone out of scope' );
 
-	return $builder->tag_class->new(
+	return $builder->new_tag(
 		qname   => $self,
 		attr    => $attr,
 		content => [ map $builder->render( $_ ), @_ ],
-		builder => $builder,
 	);
 }
 
@@ -414,15 +430,14 @@ sub foreach {
 	do {
 		XML::Builder::Util::merge_param_hash( $attr, \@_ );
 		my $content = XML::Builder::Util::is_raw_hash( $_[0] ) ? undef : shift;
-		push @out, $builder->tag_class->new(
+		push @out, $builder->new_tag(
 			qname   => $self,
 			attr    => {%$attr},
 			content => $builder->render( $content ),
-			builder => $builder,
 		);
 	} while @_;
 
-	return $builder->fragment_class->new( builder => $builder, content => \@out )
+	return $builder->new_fragment( content => \@out )
 		if @out > 1 and not wantarray;
 
 	return @out[ 0 .. $#out ];
@@ -456,10 +471,17 @@ sub as_string {
 
 sub append {
 	my $self = shift;
-	return $self->builder->fragment_class->new(
-		builder => $self->builder,
-		content => [ $self, $self->builder->render( @_ ) ],
-	);
+	return $self->builder->new_fragment( content => [ $self, $self->builder->render( @_ ) ] );
+}
+
+sub root {
+	my $self = shift;
+	bless $self, $self->builder->root_class;
+}
+
+sub document {
+	my $self = shift;
+	bless $self, $self->builder->document_class;
 }
 
 sub flatten { shift }
@@ -473,11 +495,19 @@ use overload '""' => 'as_string';
 
 sub depends_ns_scope { 0 }
 
-sub adopt {
-	my $class = shift;
-	my ( $obj ) = @_;
-	$obj->builder->nsmap_to_attr( $obj->attr ||= {} );
-	return bless $obj, $class;
+sub as_string {
+	my $self = shift;
+
+	my %decl = map $_->xmlns, $self->builder->get_namespaces;
+
+	# make sure to always declare the default NS (if not bound to a URI, by
+	# explicitly undefining it) to allow embedding the XML easily without
+	# having to parse the fragment
+	$decl{'xmlns'} = '' if not defined $decl{'xmlns'};
+
+	local @{ $self->attr }{ keys %decl } = values %decl;
+
+	return $self->SUPER::as_string( @_ );
 }
 
 #######################################################################
