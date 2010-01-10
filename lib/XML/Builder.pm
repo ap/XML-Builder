@@ -6,31 +6,10 @@ use Scalar::Util ();
 use Encode ();
 use Carp::Clan '^XML::Builder(?:\z|::)';
 
-sub is_raw_hash {
-	my ( $scalar ) = @_;
-	return
-		'HASH' eq ref $scalar
-		and not Scalar::Util::blessed $scalar;
-}
-
-sub is_raw_array {
-	my ( $scalar ) = @_;
-	return
-		'ARRAY' eq ref $scalar
-		and not Scalar::Util::blessed $scalar;
-}
-
-sub is_raw_scalar {
-	my ( $scalar ) = @_;
-	return
-		'SCALAR' eq ref $scalar
-		and not Scalar::Util::blessed $scalar;
-}
-
 sub merge_param_hash {
 	my ( $cur, $param ) = @_;
 
-	return if not ( @$param and is_raw_hash $param->[0] );
+	return if not ( @$param and 'HASH' eq ref $param->[0] );
 
 	my $new = shift @$param;
 
@@ -170,7 +149,7 @@ sub unsafe {
 
 sub render {
 	my $self = shift;
-	return XML::Builder::Util::is_raw_scalar( $_[0] )
+	return 'SCALAR' eq ref $_[0]
 		? $self->qname( ${$_[0]}, @_[ 1 .. $#_ ] )
 		: $self->new_fragment( content => [ @_ ] );
 }
@@ -295,11 +274,11 @@ sub new {
 
 	my ( @gather, @take );
 
-	for my $r ( XML::Builder::Util::is_raw_array( $content ) ? @$content : $content ) {
+	for my $r ( 'ARRAY' eq ref $content ? @$content : $content ) {
 		@take = $r;
 
 		if ( not Scalar::Util::blessed $r ) {
-			@take = $builder->render( @_ ) if XML::Builder::Util::is_raw_array $r;
+			@take = $builder->render( @_ ) if 'ARRAY' eq ref $r;
 			next;
 		}
 
@@ -429,7 +408,7 @@ sub foreach {
 
 	do {
 		XML::Builder::Util::merge_param_hash( $attr, \@_ );
-		my $content = XML::Builder::Util::is_raw_hash( $_[0] ) ? undef : shift;
+		my $content = 'HASH' eq ref $_[0] ? undef : shift;
 		push @out, $builder->new_tag(
 			qname   => $self,
 			attr    => {%$attr},
