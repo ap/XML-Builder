@@ -137,14 +137,29 @@ sub root {
 
 sub document {
 	my $self = shift;
-	my ( $tag ) = @_;
-	return $tag->document;
+	return $self->new_document( content => [ @_ ] );
 }
 
 sub unsafe {
 	my $self = shift;
 	my ( $string ) = @_;
 	return $self->new_unsafe( content => $string );
+}
+
+sub comment {
+	my $self = shift;
+	my ( $comment ) = $self->stringify( @_ );
+	XML::Builder::Util::croak( "Comment contains double dashes '$1...'" )
+		if $comment =~ /(.*?--)/;
+	return $self->new_unsafe( "<!--$comment-->" );
+}
+
+sub pi {
+	my $self = shift;
+	my ( $name, $content ) = map $self->stringify( $_ ), @_;
+	XML::Builder::Util::croak( "PI contains terminator '$1...'" )
+		if $content =~ /(.*\?>)/;
+	return $self->new_unsafe( "<?$name $content?>" );
 }
 
 sub render {
@@ -202,8 +217,6 @@ sub stringify {
 
 	XML::Builder::Util::croak( 'Unstringifiable object ', $thing );
 }
-
-sub preamble { qq(<?xml version="1.0" encoding="${\shift->encoding}"?>\n) }
 
 #######################################################################
 
@@ -330,6 +343,8 @@ sub flatten {
 package XML::Builder::Fragment::Unsafe;
 
 use parent -norequire => 'XML::Builder::Fragment';
+
+sub depends_ns_scope { 0 }
 
 sub new {
 	my $class = shift;
@@ -458,11 +473,6 @@ sub root {
 	bless $self, $self->builder->root_class;
 }
 
-sub document {
-	my $self = shift;
-	bless $self, $self->builder->document_class;
-}
-
 sub flatten { shift }
 
 #######################################################################
@@ -493,11 +503,40 @@ sub as_string {
 
 package XML::Builder::Fragment::Document;
 
-use parent -norequire => 'XML::Builder::Fragment::Root';
+use parent -norequire => 'XML::Builder::Fragment';
+use overload '""' => 'as_string';
+
+sub new {
+	my $class = shift;
+	my $self = $class->SUPER::new( @_ );
+	$self->validate;
+	return $self;
+}
+
+sub validate {
+	my $self = shift;
+	my @root;
+
+	for ( @{ $self->content } ) {
+		if ( Scalar::Util::blessed $_ ) {
+			if ( $_->isa( $self->builder->tag_class ) ) { push @root, $_; next }
+			if ( $_->isa( $self->builder->unsafe_class ) ) { next }
+		}
+		XML::Builder::Util::croak( 'Junk at top level of document' );
+	}
+
+	XML::Builder::Util::croak( 'Document must have exactly one document element, not ' . @root )
+		if @root != 1;
+
+	$root[0]->root;
+
+	return;
+}
 
 sub as_string {
 	my $self = shift;
-	return $self->builder->preamble . $self->SUPER::as_string( @_ );
+	my $preamble = qq(<?xml version="1.0" encoding="${\$self->builder->encoding}"?>\n);
+	return $preamble . $self->SUPER::as_string( @_ );
 }
 
 #######################################################################
