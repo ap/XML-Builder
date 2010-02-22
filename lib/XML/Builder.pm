@@ -1,3 +1,5 @@
+# ABSTRACT: programmatic XML generation, conveniently
+
 use strict;
 
 package XML::Builder::Util;
@@ -33,9 +35,6 @@ sub $new_method { \$_[0]->$class_method->new( builder => \@_ ) }
 package XML::Builder;
 
 use Object::Tiny::Lvalue qw( nsmap default_ns encoding );
-
-our $VERSION = '1.0001';
-$VERSION = eval $VERSION;
 
 BEGIN {
 	# these aren't constants, they need to be overridable in subclasses
@@ -544,3 +543,9 @@ sub as_string {
 #######################################################################
 
 1;
+
+=head1 DESCRIPTION
+
+For now, please refer to the test suite that ships with this module.
+
+Documentation will soon be added. Please be patient.
