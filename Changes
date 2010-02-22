@@ -1,6 +1,14 @@
 =head1 Revision history for XML-Builder
 
-=head2 {{$NEXT}}
+=head2 0.901 (2010-02-22)
+
+=over 4
+
+=item * Fix broken package and L<Dist::Zilla> config
+
+=back
+
+=head2 0.900 (2010-02-22)
 
 =over 4
 

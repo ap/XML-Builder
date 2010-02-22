@@ -1,6 +1,8 @@
-# ABSTRACT: programmatic XML generation, conveniently
-
 use strict;
+
+package XML::Builder;
+
+# ABSTRACT: programmatic XML generation, conveniently
 
 package XML::Builder::Util;
 
