@@ -176,6 +176,8 @@ sub test_fragment {
 }
 
 {
+	no warnings 'qw';
+
 	my %XML_NCR = map eval "qq[$_]", qw(
 		\xA &#10;  \xD &#13;
 		&   &amp;  <   &lt;   > &gt;
@@ -185,7 +187,7 @@ sub test_fragment {
 	my %type = (
 		encode      => undef,
 		escape_text => qr/([<>&'"])/,
-		escape_attr => qr/([<>&'"\xA\xD])/,
+		escape_attr => qr/([<>&'"\x0A\x0D])/,
 	);
 
 	# using eval instead of closures to avoid __ANON__
