@@ -226,7 +226,7 @@ sub stringify {
 package XML::Builder::NS;
 
 use Object::Tiny::Lvalue qw( builder uri prefix qname_for_localname );
-use overload '""' => 'uri';
+use overload '""' => 'uri', fallback => 1;
 
 sub new {
 	my $class = shift;
@@ -370,7 +370,7 @@ package XML::Builder::Fragment::QName;
 use Object::Tiny::Lvalue qw( builder ns name as_qname as_attr_qname as_clarkname as_string );
 
 use parent -norequire => 'XML::Builder::Fragment';
-use overload '""' => 'as_clarkname';
+use overload '""' => 'as_clarkname', fallback => 1;
 
 sub new {
 	my $class = shift;
@@ -483,7 +483,7 @@ sub flatten { shift }
 package XML::Builder::Fragment::Root;
 
 use parent -norequire => 'XML::Builder::Fragment::Tag';
-use overload '""' => 'as_string';
+use overload '""' => 'as_string', fallback => 1;
 
 sub depends_ns_scope { 0 }
 
@@ -507,7 +507,7 @@ sub as_string {
 package XML::Builder::Fragment::Document;
 
 use parent -norequire => 'XML::Builder::Fragment';
-use overload '""' => 'as_string';
+use overload '""' => 'as_string', fallback => 1;
 
 sub new {
 	my $class = shift;

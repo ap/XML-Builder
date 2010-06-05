@@ -1,5 +1,15 @@
 =head1 Revision history for XML-Builder
 
+=head2 0.902 (2010-06-05)
+
+=over 4
+
+=item * Enabled C<fallback> for all overloads
+
+Fixes #57778 (Test suite fails with Test-Builder-0.95_02)
+
+=back
+
 =head2 0.901 (2010-02-22)
 
 =over 4
