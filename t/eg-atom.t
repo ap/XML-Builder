@@ -1,12 +1,12 @@
 use strict;
 use XML::Builder;
-use Test::More tests => 5;
+use Test::More tests => 1;
 
-isa_ok my $xb = XML::Builder->new, 'XML::Builder';
-isa_ok my $a = $xb->ns( 'http://www.w3.org/2005/Atom' => '' ), 'XML::Builder::NS::QNameFactory';
+my $xb = XML::Builder->new;
+my $a = $xb->ns( 'http://www.w3.org/2005/Atom' => '' );
 
-isa_ok my $hb = XML::Builder->new, 'XML::Builder';
-isa_ok my $h = $hb->ns( 'http://www.w3.org/1999/xhtml' => '' ), 'XML::Builder::NS::QNameFactory';
+my $hb = XML::Builder->new;
+my $h = $hb->ns( 'http://www.w3.org/1999/xhtml' => '' );
 
 chomp( my $expected = << '' );
 <?xml version="1.0" encoding="us-ascii"?>

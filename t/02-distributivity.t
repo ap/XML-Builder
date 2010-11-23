@@ -1,9 +1,9 @@
 use strict;
 use XML::Builder;
-use Test::More tests => 6;
+use Test::More tests => 4;
 
-isa_ok my $xb = XML::Builder->new, 'XML::Builder';
-isa_ok my $x  = $xb->null_ns, 'XML::Builder::NS::QNameFactory';
+my $xb = XML::Builder->new;
+my $x  = $xb->null_ns;
 
 is $x->b->foreach( 'a', 'b' )->as_string, '<b>a</b><b>b</b>', 'simple distributivity';
 is $x->p->foreach( $x->b->foreach( 'a', 'b' ) )->as_string, '<p><b>a</b></p><p><b>b</b></p>', 'distributivity w/ nesting';

@@ -1,8 +1,8 @@
 use strict;
 use XML::Builder;
-use Test::More tests => 2;
+use Test::More tests => 1;
 
-isa_ok my $x = XML::Builder->new, 'XML::Builder';
+my $x = XML::Builder->new;
 
 my @arg = ( \'', 'p', { class => 'normal' }, '' );
 

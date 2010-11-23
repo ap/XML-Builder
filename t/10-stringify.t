@@ -1,8 +1,8 @@
 use strict;
 use XML::Builder;
-use Test::More tests => 5;
+use Test::More tests => 4;
 
-isa_ok my $x = XML::Builder->new, 'XML::Builder';
+my $x = XML::Builder->new;
 
 {
 package SomeClass;

@@ -1,9 +1,9 @@
 use strict;
 use XML::Builder;
-use Test::More tests => 8;
+use Test::More tests => 6;
 
-isa_ok my $xb = XML::Builder->new, 'XML::Builder';
-isa_ok my $x  = $xb->null_ns, 'XML::Builder::NS::QNameFactory';
+my $xb = XML::Builder->new;
+my $x  = $xb->null_ns;
 
 # Tags
 is $x->br->as_string, '<br/>', 'simple closed tag';

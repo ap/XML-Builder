@@ -1,9 +1,9 @@
 use strict;
 use XML::Builder;
-use Test::More tests => 3;
+use Test::More tests => 1;
 
-isa_ok my $xb = XML::Builder->new, 'XML::Builder';
-isa_ok my $h = $xb->ns( 'http://www.w3.org/1999/xhtml' => '' ), 'XML::Builder::NS::QNameFactory';
+my $xb = XML::Builder->new;
+my $h = $xb->ns( 'http://www.w3.org/1999/xhtml' => '' );
 
 chomp( my $expected = <<'' );
 <html xmlns="http://www.w3.org/1999/xhtml"><head><title>Sample page</title></head><body>
