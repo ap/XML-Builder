@@ -545,8 +545,11 @@ sub $new_method { \$_[0]->$class_method->new( builder => \@_ ) }
 
 1;
 
+__END__
+
 =head1 DESCRIPTION
 
 For now, please refer to the test suite that ships with this module.
 
-Documentation will soon be added. Please be patient.
+Documentation will be added when the design settles.
+Please be unreasonably patient.
