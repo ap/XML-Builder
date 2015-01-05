@@ -1,12 +1,17 @@
 Revision history for XML-Builder
 
+0.904 Mon  5 Jan 2015
+	- No functional changes
+	- Re-released with workaround for insufficient Dist::Zilla smarts
+	  (c.f. <https://github.com/rjbs/Dist-Zilla/issues/404>)
+
 0.903 Sat  3 Jan 2015
 	- No functional changes
 	- Switched to MakeMaker
 	- Regenerated package
 
 0.902 Sat  5 Jun 2010
-	- Enabled C<fallback> for all overloads
+	- Enabled `fallback` for all overloads
 	  Fixes #57778 (Test suite fails with Test-Builder-0.95_02)
 
 0.901 Mon 22 Feb 2010

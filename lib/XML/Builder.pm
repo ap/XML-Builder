@@ -2,10 +2,6 @@ use 5.008001;
 use strict;
 use warnings;
 
-package XML::Builder;
-
-# ABSTRACT: programmatic XML generation, conveniently
-
 package XML::Builder::Util;
 
 use Scalar::Util ();
@@ -37,6 +33,8 @@ sub $new_method { \$_[0]->$class_method->new( builder => \@_ ) }
 #######################################################################
 
 package XML::Builder;
+
+# ABSTRACT: programmatic XML generation, conveniently
 
 use Object::Tiny::Lvalue qw( nsmap default_ns encoding );
 
