@@ -2,35 +2,8 @@ use 5.008001;
 use strict;
 use warnings;
 
-package XML::Builder::Util;
-
 use Scalar::Util ();
 use Encode ();
-use Carp::Clan '^XML::Builder(?:\z|::)';
-
-sub merge_param_hash {
-	my ( $cur, $param ) = @_;
-
-	return if not ( @$param and 'HASH' eq ref $param->[0] );
-
-	my $new = shift @$param;
-
-	@{ $cur }{ keys %$new } = values %$new;
-	while ( my ( $k, $v ) = each %$cur ) {
-		delete $cur->{ $k } if not defined $v;
-	}
-}
-
-sub factory_method {
-	my ( $name, $class ) = @_;
-	my ( $class_method, $new_method ) = ( "$name\_class", "new_$name" );
-	return <<";";
-sub $class_method { "\Q$class\E" }
-sub $new_method { \$_[0]->$class_method->new( builder => \@_ ) }
-;
-}
-
-#######################################################################
 
 package XML::Builder;
 
@@ -38,22 +11,20 @@ package XML::Builder;
 
 use Object::Tiny::Lvalue qw( nsmap default_ns encoding );
 
-BEGIN {
-	# these aren't constants, they need to be overridable in subclasses
-	my %class = (
-		ns       => 'XML::Builder::NS',
-		fragment => 'XML::Builder::Fragment',
-		qname    => 'XML::Builder::Fragment::QName',
-		tag      => 'XML::Builder::Fragment::Tag',
-		unsafe   => 'XML::Builder::Fragment::Unsafe',
-		root     => 'XML::Builder::Fragment::Root',
-		document => 'XML::Builder::Fragment::Document',
-	);
+# these aren't constants, they need to be overridable in subclasses
+my %class = (
+	ns       => 'XML::Builder::NS',
+	fragment => 'XML::Builder::Fragment',
+	qname    => 'XML::Builder::Fragment::QName',
+	tag      => 'XML::Builder::Fragment::Tag',
+	unsafe   => 'XML::Builder::Fragment::Unsafe',
+	root     => 'XML::Builder::Fragment::Root',
+	document => 'XML::Builder::Fragment::Document',
+);
 
-	my ( $name, $class );
-	eval XML::Builder::Util::factory_method( $name, $class )
-		while ( $name, $class ) = each %class;
-}
+my ( $name, $class );
+eval XML::Builder::Util::factory_method( $name, $class )
+	while ( $name, $class ) = each %class;
 
 sub new {
 	my $class = shift;
@@ -543,6 +514,34 @@ sub as_string {
 }
 
 #######################################################################
+
+BEGIN {
+package XML::Builder::Util;
+
+use Carp::Clan '^XML::Builder(?:\z|::)';
+
+sub merge_param_hash {
+	my ( $cur, $param ) = @_;
+
+	return if not ( @$param and 'HASH' eq ref $param->[0] );
+
+	my $new = shift @$param;
+
+	@{ $cur }{ keys %$new } = values %$new;
+	while ( my ( $k, $v ) = each %$cur ) {
+		delete $cur->{ $k } if not defined $v;
+	}
+}
+
+sub factory_method {
+	my ( $name, $class ) = @_;
+	my ( $class_method, $new_method ) = ( "$name\_class", "new_$name" );
+	return <<";";
+sub $class_method { "\Q$class\E" }
+sub $new_method { \$_[0]->$class_method->new( builder => \@_ ) }
+;
+}
+}
 
 1;
 
