@@ -1,0 +1,31 @@
+=pod
+
+=encoding UTF-8
+
+=head1 NAME
+
+XML::Builder - programmatic XML generation, conveniently
+
+=head1 VERSION
+
+version 0.905
+
+=head1 DESCRIPTION
+
+For now, please refer to the test suite that ships with this module.
+
+Documentation will be added when the design settles.
+Please be unreasonably patient.
+
+=head1 AUTHOR
+
+Aristotle Pagaltzis <pagaltzis@gmx.de>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2015 by Aristotle Pagaltzis.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut
