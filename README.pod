@@ -8,7 +8,7 @@ XML::Builder - programmatic XML generation, conveniently
 
 =head1 VERSION
 
-version 0.905
+version 0.906
 
 =head1 DESCRIPTION
 
