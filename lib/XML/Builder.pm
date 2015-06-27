@@ -265,7 +265,7 @@ sub new {
 		@take = $r;
 
 		if ( not Scalar::Util::blessed $r ) {
-			@take = $builder->render( @_ ) if 'ARRAY' eq ref $r;
+			@take = $builder->render( @$r ) if 'ARRAY' eq ref $r;
 			next;
 		}
 
