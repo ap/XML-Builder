@@ -2,7 +2,6 @@ requires 'perl', '5.008001';
 requires 'strict';
 requires 'warnings';
 requires 'overload';
-requires 'parent';
 requires 'Encode';
 requires 'Scalar::Util';
 
