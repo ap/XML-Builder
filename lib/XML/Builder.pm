@@ -547,6 +547,8 @@ sub $new_method { \$_[0]->$class_method->new( builder => \@_ ) }
 
 __END__
 
+=pod
+
 =head1 DESCRIPTION
 
 For now, please refer to the test suite that ships with this module.
