@@ -5,7 +5,7 @@ use Encode ();
 
 package XML::Builder;
 
-our $VERSION = '0.906';
+our $VERSION = '0.907';
 
 use Object::Tiny::Lvalue qw( nsmap default_ns encoding );
 
@@ -194,7 +194,7 @@ sub stringify {
 
 package XML::Builder::NS;
 
-our $VERSION = '0.906';
+our $VERSION = '0.907';
 
 use Object::Tiny::Lvalue qw( builder uri prefix qname_for_localname );
 use overload '""' => 'uri', fallback => 1;
@@ -233,7 +233,7 @@ sub factory { bless \shift, 'XML::Builder::NS::QNameFactory' }
 
 package XML::Builder::NS::QNameFactory;
 
-our $VERSION = '0.906';
+our $VERSION = '0.907';
 
 sub AUTOLOAD { my $self = shift; $$self->qname( ( our $AUTOLOAD =~ /.*::(.*)/ ), @_ ) }
 sub _qname   { my $self = shift; $$self->qname(                                  @_ ) }
@@ -243,7 +243,7 @@ sub DESTROY  {}
 
 package XML::Builder::Fragment::Role;
 
-our $VERSION = '0.906';
+our $VERSION = '0.907';
 
 sub depends_ns_scope { 1 }
 
@@ -251,7 +251,7 @@ sub depends_ns_scope { 1 }
 
 package XML::Builder::Fragment;
 
-our $VERSION = '0.906';
+our $VERSION = '0.907';
 
 our @ISA = 'XML::Builder::Fragment::Role';
 
@@ -322,7 +322,7 @@ sub flatten {
 
 package XML::Builder::Fragment::Unsafe;
 
-our $VERSION = '0.906';
+our $VERSION = '0.907';
 
 our @ISA = 'XML::Builder::Fragment';
 
@@ -346,7 +346,7 @@ sub flatten { shift }
 
 package XML::Builder::Fragment::QName;
 
-our $VERSION = '0.906';
+our $VERSION = '0.907';
 
 use Object::Tiny::Lvalue qw( builder ns name as_qname as_attr_qname as_clarkname as_string );
 
@@ -425,7 +425,7 @@ sub foreach {
 
 package XML::Builder::Fragment::Tag;
 
-our $VERSION = '0.906';
+our $VERSION = '0.907';
 
 our @ISA = 'XML::Builder::Fragment';
 use Object::Tiny::Lvalue qw( qname attr );
@@ -465,7 +465,7 @@ sub flatten { shift }
 
 package XML::Builder::Fragment::Root;
 
-our $VERSION = '0.906';
+our $VERSION = '0.907';
 
 our @ISA = 'XML::Builder::Fragment::Tag';
 use overload '""' => 'as_string', fallback => 1;
@@ -491,7 +491,7 @@ sub as_string {
 
 package XML::Builder::Fragment::Document;
 
-our $VERSION = '0.906';
+our $VERSION = '0.907';
 
 our @ISA = 'XML::Builder::Fragment';
 use overload '""' => 'as_string', fallback => 1;
@@ -534,7 +534,7 @@ sub as_string {
 BEGIN {
 package XML::Builder::Util;
 
-our $VERSION = '0.906';
+our $VERSION = '0.907';
 
 use Carp::Clan '^XML::Builder(?:\z|::)';
 
