@@ -247,7 +247,7 @@ sub depends_ns_scope { 1 }
 
 package XML::Builder::Fragment;
 
-use parent -norequire => 'XML::Builder::Fragment::Role';
+our @ISA = 'XML::Builder::Fragment::Role';
 
 use Object::Tiny::Lvalue qw( builder content );
 
@@ -316,7 +316,7 @@ sub flatten {
 
 package XML::Builder::Fragment::Unsafe;
 
-use parent -norequire => 'XML::Builder::Fragment';
+our @ISA = 'XML::Builder::Fragment';
 
 sub depends_ns_scope { 0 }
 
@@ -340,7 +340,7 @@ package XML::Builder::Fragment::QName;
 
 use Object::Tiny::Lvalue qw( builder ns name as_qname as_attr_qname as_clarkname as_string );
 
-use parent -norequire => 'XML::Builder::Fragment';
+our @ISA = 'XML::Builder::Fragment';
 use overload '""' => 'as_clarkname', fallback => 1;
 
 sub new {
@@ -415,7 +415,7 @@ sub foreach {
 
 package XML::Builder::Fragment::Tag;
 
-use parent -norequire => 'XML::Builder::Fragment';
+our @ISA = 'XML::Builder::Fragment';
 use Object::Tiny::Lvalue qw( qname attr );
 
 sub depends_ns_scope { 1 }
@@ -453,7 +453,7 @@ sub flatten { shift }
 
 package XML::Builder::Fragment::Root;
 
-use parent -norequire => 'XML::Builder::Fragment::Tag';
+our @ISA = 'XML::Builder::Fragment::Tag';
 use overload '""' => 'as_string', fallback => 1;
 
 sub depends_ns_scope { 0 }
@@ -477,7 +477,7 @@ sub as_string {
 
 package XML::Builder::Fragment::Document;
 
-use parent -norequire => 'XML::Builder::Fragment';
+our @ISA = 'XML::Builder::Fragment';
 use overload '""' => 'as_string', fallback => 1;
 
 sub new {
